@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Arena Test">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1b2550">
+<title>Arena Test</title>
+<style>
+:root{--bg:#0c1024;--card:#151b38;--ink:#eceffa;--muted:#a3a9c6;--amber:#f5b335;--amber-ink:#2b1c00;--good:#53c48a;--line:#2a3260;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+ padding:calc(env(safe-area-inset-top,0px) + 20px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 32px) max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:640px;margin:0 auto;display:grid;gap:16px}
+h1{font-size:28px;margin:0}
+p{margin:0;color:var(--muted)}
+.mode{padding:12px 14px;border-radius:12px;font-weight:700}
+.mode.yes{background:#123824;color:var(--good)}
+.mode.no{background:#3a2a08;color:var(--amber)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:10px}
+.svc{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber)}
+.t{font-size:19px;font-weight:700}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btns a{flex:1;min-width:130px;text-align:center;text-decoration:none;font-weight:700;padding:11px 12px;border-radius:10px}
+.a{background:var(--amber);color:var(--amber-ink)}
+.b{border:2px solid var(--amber);color:var(--amber)}
+small{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Arena Test</h1>
+  <div id="mode" class="mode no">Checking…</div>
+  <p>Each title has two buttons. <b>A</b> opens the link in place. <b>B</b> opens it as a new window. Try both, and note whether the streaming app opens on the right title.</p>
+  <div id="list"></div>
+  <small>Test page for Arena (working name). Links from Watchmode, US availability, November 2026.</small>
+</div>
+<script>
+const items=[
+ ["1","Hulu","Community · one episode","https://www.hulu.com/watch/ac68cb05-3b95-4cc2-8fe9-a17685430022"],
+ ["2","Disney+","The Simpsons · one episode","https://www.disneyplus.com/play/b55d9399-97ee-48f5-a039-80a6ea5c6a2e"],
+ ["3","Hulu","Ghostbusters (1984)","https://www.hulu.com/watch/0a7184af-7705-4884-bcef-908c27edb1af"],
+ ["4","HBO add-on in Hulu","Coraline (2009)","https://www.hulu.com/watch/ab8250e8-0610-46dc-ad81-22b2b185f0ad"],
+ ["5","Disney+","Hocus Pocus (1993)","https://www.disneyplus.com/browse/entity-b99c38fd-44ae-402f-b727-bc7fccb63740"],
+ ["6","Netflix","Brooklyn Nine-Nine","https://www.netflix.com/title/80217708"],
+ ["7","YouTube · free movies","Corpse Bride (2005)","https://www.youtube.com/watch?v=9l9Se-4QbdY"],
+ ["8","Tubi · free","The Imitation Game (2014)","https://tubitv.com/movies/569761"]
+];
+const list=document.getElementById("list");
+list.style.display="grid";list.style.gap="12px";
+for(const [n,svc,t,u] of items){
+  const c=document.createElement("div");c.className="card";
+  c.innerHTML=`<span class="svc">${n} · ${svc}</span><span class="t"></span><div class="btns"><a class="a">A · Open</a><a class="b" target="_blank" rel="noopener">B · New window</a></div>`;
+  c.querySelector(".t").textContent=t;
+  c.querySelectorAll("a").forEach(a=>a.href=u);
+  list.append(c);
+}
+const standalone=window.navigator.standalone===true||matchMedia("(display-mode: standalone)").matches;
+const m=document.getElementById("mode");
+if(standalone){m.className="mode yes";m.textContent="✓ Opened from your home screen. This is the real test."}
+else{m.textContent="You're in Safari. Tap Share, then Add to Home Screen, then open Arena Test from your home screen."}
+</script>
+</body>
+</html>
