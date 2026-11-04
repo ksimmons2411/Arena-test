@@ -330,9 +330,9 @@ ep("Goosebumps",1,1,"The Haunted Mask",1995,22,"Halloween,Family");
 
 /* Real data: merge TMDB details and Watchmode availability (app/catalog.js) into the curated titles. */
 (function(){const C=window.CATALOG;if(!C)return;
- MV.forEach(o=>{const c=C.movies[o.title+"|"+o.year];if(c)Object.assign(o,{tmdb:c.tmdb,year:c.year,min:c.min||o.min,ov:c.ov,img:c.img,trailer:c.trailer,src:c.src,real:true})});
- SR.forEach(o=>{const c=C.shows[o.title];if(c)Object.assign(o,{tmdb:c.tmdb,ov:c.ov,img:c.img,src:c.src,real:true})});
- EP.forEach(o=>{const c=C.episodes[BY[o.series].title+"|"+o.s+"|"+o.e];if(c)Object.assign(o,{s0:o.s,e0:o.e,s:c.s,e:c.e,title:c.title,year:c.year||o.year,min:c.min||o.min,ov:c.ov,img:c.img,real:true})});
+ MV.forEach(o=>{const c=C.movies[o.title+"|"+o.year];if(c)Object.assign(o,{tmdb:c.tmdb,year:c.year,min:c.min||o.min,ov:c.ov,img:c.img,bg:c.bg,trailer:c.trailer,src:c.src,buy:c.buy,real:true})});
+ SR.forEach(o=>{const c=C.shows[o.title];if(c)Object.assign(o,{tmdb:c.tmdb,ov:c.ov,img:c.img,bg:c.bg,src:c.src,buy:c.buy,real:true})});
+ EP.forEach(o=>{const c=C.episodes[BY[o.series].title+"|"+o.s+"|"+o.e];if(c)Object.assign(o,{s0:o.s,e0:o.e,s:c.s,e:c.e,title:c.title,year:c.year||o.year,min:c.min||o.min,ov:c.ov,img:c.img,bg:c.bg,real:true})});
 })();
 const checkedOn=()=>window.CATALOG?new Date(window.CATALOG.checked+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"";
 
@@ -387,7 +387,13 @@ function pickSrc(srcs){
   const yours=s=>!s.free&&mine.includes(s.svc)&&(via[s.svc]||null)===(s.via||null);
   return srcs.find(yours)||srcs.find(s=>s.free&&mine.includes(s.svc))||srcs.find(s=>s.free)||null;
 }
+const STORES={"Apple TV":"https://tv.apple.com/search?term=","Prime Video":"https://www.primevideo.com/search?phrase=","Fandango at Home":"https://athome.fandango.com/content/browse/search?searchString=","Google TV":"https://play.google.com/store/search?c=movies&q="};
+const ownKey=it=>it.kind==="episode"?it.series:it.id;
+const ownOf=it=>(ST.own||{})[ownKey(it)]||null;
 function target(it){
+  const store=ownOf(it);
+  if(store){const base=it.kind==="episode"?BY[it.series]:it,u=(base.buy||{})[store];
+    return{n:store,u:u||STORES[store]+encodeURIComponent(base.title),ok:true,owned:true,search:!u};}
   const srcs=srcOf(it);
   if(srcs){
     const q=it.kind==="episode"?BY[it.series].title:it.title;
@@ -440,10 +446,10 @@ function cardX(it,extra){
   const ep=it.kind==="episode",ser=it.kind==="series",t=ser?null:target(it);
   const inner=`${it.img?`<img class="pimg" src="${it.img}" alt="" loading="lazy" onerror="this.remove()">`:""}<span class="tr"><span class="ic">${icOf(it)}</span>${ep?`<span class="seb">${se(it)}</span>`:""}</span><span class="bt">${ep?`<span class="sh">${esc(BY[it.series].title)}</span>`:""}<b>${esc(it.title)}</b></span>${it.img?"":`<span class="ph">Sample art</span>`}`;
   const art=ser?`<button class="art ${gOf(it)}${it.img?" hasimg":""}" data-act="detail" data-id="${it.id}" aria-label="Choose an episode of ${esc(it.title)}">${inner}</button>`
-    :`<a class="art ${gOf(it)}${it.img?" hasimg":""}" href="${t.u}" target="_blank" rel="noopener" aria-label="Open ${esc(label(it))} in ${esc(t.n)}">${inner}</a>`;
+    :`<a class="art ${gOf(it)}${it.img?" hasimg":""}" href="${t.u}" aria-label="Open ${esc(label(it))} in ${esc(t.n)}">${inner}</a>`;
   const m=ep?esc(BY[it.series].title)+" · "+se(it):ser?"Series · "+epsOf(it.id).length+" ep.":it.year+" · "+fmtMin(it.min);
   return `<div class="card${ep?" ep":""}">${art}<button class="ct" data-act="detail" data-id="${it.id}">${esc(it.title)}</button><div class="cm">${m}</div>`+
-    (t?`<div class="cm svc">▶ ${t.check?"Check ":""}${esc(t.n)}${t.ok===false?" · not in My Services":""}</div>`:`<div class="cm svc">Pick an episode</div>`)+(extra||"")+pills(it)+`</div>`;
+    (t?`<div class="cm svc">▶ ${t.check?"Check ":t.search&&!t.owned?"Search in ":""}${esc(t.n)}${t.owned?" · yours":t.ok===false?" · not in My Services":""}</div>`:`<div class="cm svc">Pick an episode</div>`)+(extra||"")+pills(it)+`</div>`;
 }
 const card=it=>cardX(it,"");
 const libCard=it=>{const n=plCountOf(it.id);return cardX(it,`<div class="cm">${n?"In "+n+" playlist"+(n>1?"s":""):"Not in a playlist"}</div>`)};
@@ -466,7 +472,7 @@ function sugBanner(src){
   if(!suggest||suggest.src!==src)return"";
   const it=BY[suggest.id];if(!it)return"";const t=it.kind==="series"?null:target(it);
   return `<div class="sug"><div><b>How about this one?</b><div class="cm">${esc(label(it))}</div><div class="cm">A random pick. Arena does not start playback across apps.</div></div>`+
-    (t?`<a class="btn" href="${t.u}" target="_blank" rel="noopener">${openLbl(t)}</a>`:"")+
+    (t?`<a class="btn" href="${t.u}">${openLbl(t)}</a>`:"")+
     `<button class="btn alt" data-act="detail" data-id="${it.id}">Details</button><button class="btn alt" data-act="suggest" data-src="${src}">Another</button></div>`;
 }
 const totalMin=items=>items.reduce((s,x)=>s+(x.min||0),0);
@@ -475,9 +481,10 @@ const totalMin=items=>items.reduce((s,x)=>s+(x.min||0),0);
 function home(){
   const {it,th}=tonight(),t=target(it);
   const rec=ST.recent.map(r=>plOf(r.id)).filter(Boolean);
-  let h=`<div class="note">Prototype with a small hand-picked sample catalog. Artwork is placeholder art, and links open each service's search page.</div>`;
-  h+=`<section class="hero ${gOf(it)}"><span class="kick">Tonight's pick${th?" · "+th:""}</span><h1>${esc(it.kind==="episode"?BY[it.series].title+": "+it.title:it.title)}</h1><div class="cm">${esc(it.kind==="episode"?se(it)+" · ":it.year+" · ")+fmtMin(it.min)} · placeholder art</div>`+
-    `<div class="pills"><a class="btn" href="${t.u}" target="_blank" rel="noopener">${openLbl(t)}</a><button class="btn alt" data-act="detail" data-id="${it.id}">Details</button><button class="btn alt" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button><button class="btn alt" data-act="addpl" data-id="${it.id}">+ Playlist</button></div></section>`;
+  let h=`<div class="note">Starter catalog with real titles, artwork and where-to-watch from TMDB and Watchmode. Movies open in their app; episodes open a search for the show in its app until exact-episode links are added.</div>`;
+  const hbg=it.bg||(it.kind==="episode"?BY[it.series].bg:null);
+  h+=`<section class="hero ${gOf(it)}"${hbg?` style="background:linear-gradient(90deg,rgba(6,12,24,.92) 0%,rgba(6,12,24,.55) 55%,rgba(6,12,24,.15) 100%),center/cover url('${hbg}')"`:""}><span class="kick">Tonight's pick${th?" · "+th:""}</span><h1>${esc(it.kind==="episode"?BY[it.series].title+": "+it.title:it.title)}</h1><div class="cm">${esc(it.kind==="episode"?se(it)+" · ":it.year+" · ")+fmtMin(it.min)}${hbg?"":" · placeholder art"}</div>`+
+    `<div class="pills"><a class="btn" href="${t.u}">${openLbl(t)}</a><button class="btn alt" data-act="detail" data-id="${it.id}">Details</button><button class="btn alt" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button><button class="btn alt" data-act="addpl" data-id="${it.id}">+ Playlist</button></div></section>`;
   h+=`<div class="sec"><h2>Continue your playlist</h2><small>Returns to a lineup you opened</small></div>`;
   if(rec[0]){const p=rec[0];h+=`<div class="cont">${collage(p.items)}<div><b>${esc(p.name)}</b><div class="cm">${p.items.length} title${p.items.length===1?"":"s"} · you decide what to open next</div></div><button class="btn" data-act="openpl" data-id="${p.id}">Open playlist</button></div>`}
   else h+=`<div class="empty">No playlists opened yet. Tap + Playlist on any title to start one.<br><button class="btn" data-act="go" data-v="playlists">Make a playlist</button></div>`;
@@ -586,7 +593,7 @@ function plDetail(id){
   h+=`<div class="list">`+items.map((it,i)=>{
     const t=target(it),ep=it.kind==="episode";
     return `<div class="pr"><span class="se">${ep?"S"+it.s+" E"+it.e:"FILM"}</span><span class="mini ${gOf(it)}">${icOf(it)}</span><div class="tx"><b>${esc(it.title)}</b><span class="cm">${ep?esc(BY[it.series].title)+" · ":""}${it.year} · ${fmtMin(it.min)} · ${esc(t.n)}</span></div>`+
-      `<div class="pa"><a class="btn" href="${t.u}" target="_blank" rel="noopener">▶ Open</a><button class="pill${inLib(it.id)?" on":""}" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button>`+
+      `<div class="pa"><a class="btn" href="${t.u}">▶ Open</a><button class="pill${inLib(it.id)?" on":""}" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button>`+
       `<button class="ib" data-act="mv" data-i="${i}" data-d="-1" aria-label="Move up"${i===0?" disabled":""}>↑</button><button class="ib" data-act="mv" data-i="${i}" data-d="1" aria-label="Move down"${i===items.length-1?" disabled":""}>↓</button><button class="ib" data-act="rm" data-i="${i}" aria-label="Remove from playlist">✕</button></div></div>`;
   }).join("")+`</div><p class="cm" style="margin-top:12px">Removing a title here keeps it in your Library and your other playlists. Each Open button launches that service's search page; exact-episode launching still needs testing on real devices.</p>`;
   return h;
@@ -628,6 +635,12 @@ function showOv(){$("ov").hidden=false;$("ov").scrollTop=0;document.body.style.o
 function closeOv(){$("ov").hidden=true;$("ov").innerHTML="";ovMode=null;document.body.style.overflow=""}
 function closePk(){$("pk").hidden=true;$("pk").innerHTML="";pkId=null}
 function openDetail(id,season){ovMode="detail";ovId=id;ovSeason=season?+season:null;renderDetail();showOv()}
+function ownHtml(it){
+  const base=it.kind==="episode"?BY[it.series]:it,cur=ownOf(it),buy=base.buy||{};
+  const stores=Object.keys(STORES);
+  return `<div class="sechead">Own it?</div><p class="mute">If you bought ${esc(base.title)}, pick where. Arena then plays it from there first. Nothing is checked or connected.</p><div class="chips">`+
+    stores.map(n=>`<button class="chip${cur===n?" on":""}" data-act="own" data-id="${ownKey(it)}" data-v="${esc(n)}">${cur===n?"✓ ":""}${esc(n)}${buy[n]?"":" (search)"}</button>`).join("")+`</div>`;
+}
 function availText(it){
   const srcs=srcOf(it);if(!srcs)return null;
   const names=[...new Set(srcs.map(s=>s.via?s.svc+" (in "+s.via+")":s.svc+(s.free?" (free)":"")))];
@@ -642,15 +655,16 @@ function renderDetail(){
   const meta=epi?`${esc(sh.title)} · Season ${it.s} · Episode ${it.e} · ${it.year} · ${fmtMin(it.min)}`:ser?`${eps.length} ${it.real?"":"sample "}episode${eps.length===1?"":"s"} across ${seasons.length} season${seasons.length===1?"":"s"}`:`${it.year} · ${fmtMin(it.min)}`;
   const tags=themesOf(it).map(x=>`<span class="seb">${esc(x)}</span>`).join(" ");
   const avail=availText(it)||(freeOf(it)?"Listed as a free title on YouTube or Tubi. Free availability changes, so the live version checks it before showing it.":(onOf(it)?`Sample tag: streams on ${onOf(it).join(", ")}.`:"No service is tagged in the sample data, so Arena uses the first app you picked in Settings."));
-  let h=`<div class="dbox"><div class="dban ${gOf(it)}"${it.img?` style="background:center 25%/cover url('${it.img}')"`:""}><button class="ib dclose" data-act="closeov" aria-label="Close">✕</button><span class="kick">${epi?"Episode · "+esc(sh.title):ser?"Series":"Film"}${it.img?"":" · placeholder art"}</span><h1>${esc(it.title)}</h1><div class="cm">${meta}</div><div class="pills">${tags}</div><div class="pills">`+
-    (t?`<a class="btn" href="${t.u}" target="_blank" rel="noopener">${openLbl(t)}</a>`:"")+
+  let h=`<div class="dbox"><div class="dban ${gOf(it)}"${it.img?` style="background:center 25%/cover url('${it.bg||it.img}')"`:""}><button class="ib dclose" data-act="closeov" aria-label="Close">✕</button><span class="kick">${epi?"Episode · "+esc(sh.title):ser?"Series":"Film"}${it.img?"":" · placeholder art"}</span><h1>${esc(it.title)}</h1><div class="cm">${meta}</div><div class="pills">${tags}</div><div class="pills">`+
+    (t?`<a class="btn" href="${t.u}">${openLbl(t)}</a>`:"")+
     `<a class="btn alt" href="${trailerUrl(it)}" target="_blank" rel="noopener">Trailer</a><button class="btn alt" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button>`+
     (ser?"":`<button class="btn alt" data-act="addpl" data-id="${it.id}">+ Playlist</button>`)+`</div></div><div class="dbody">`;
   h+=`<p class="mute">${esc(avail)}</p>`+(it.real?(it.ov?`<p>${esc(it.ov)}</p>`:""):`<p class="mute">Synopsis, cast and real artwork come from the live catalog in the full build. Open launches the service's search page for now. Exact-episode launching is still to be tested on each service and device.</p>`);
+  h+=ownHtml(it);
   if(epi)h+=`<button class="btn alt" data-act="detail" data-id="${sh.id}" data-season="${it.s}">All episodes of ${esc(sh.title)} ›</button>`;
   if(ser){
     h+=`<div class="sechead">Episodes</div><div class="chips">${seasons.map(n=>`<button class="chip${n===ovSeason?" on":""}" data-act="season" data-v="${n}">Season ${n}</button>`).join("")}</div><div class="list">`;
-    h+=eps.filter(e=>e.s===ovSeason).map(e=>{const te=target(e);return `<div class="pr"><span class="se">E${e.e}</span><div class="tx"><b>${esc(e.title)}</b><span class="cm">S${e.s} · E${e.e} · ${e.year} · ${fmtMin(e.min)} · ${esc(te.n)}</span></div><div class="pa"><a class="btn" href="${te.u}" target="_blank" rel="noopener">▶ Open</a><button class="pill${inLib(e.id)?" on":""}" data-act="save" data-id="${e.id}">${inLib(e.id)?"♥ Saved":"♡ Save"}</button><button class="pill" data-act="addpl" data-id="${e.id}">+ Playlist</button></div></div>`}).join("")+`</div>`;
+    h+=eps.filter(e=>e.s===ovSeason).map(e=>{const te=target(e);return `<div class="pr"><span class="se">E${e.e}</span><div class="tx"><b>${esc(e.title)}</b><span class="cm">S${e.s} · E${e.e} · ${e.year} · ${fmtMin(e.min)} · ${esc(te.n)}</span></div><div class="pa"><a class="btn" href="${te.u}">▶ Open</a><button class="pill${inLib(e.id)?" on":""}" data-act="save" data-id="${e.id}">${inLib(e.id)?"♥ Saved":"♡ Save"}</button><button class="pill" data-act="addpl" data-id="${e.id}">+ Playlist</button></div></div>`}).join("")+`</div>`;
   }
   $("ov").innerHTML=h+`</div></div>`;
 }
@@ -719,6 +733,7 @@ document.addEventListener("click",ev=>{
     case"copycol":{const c=colOf(id),p=plCreate(c.name+(ST.pl.some(x=>x.name===c.name)?" copy":""));p.items=c.refs.slice();save();toast("Copied to your playlists");dview={t:"pl",id:p.id};touchRecent(p.id);render();window.scrollTo(0,0);break}
     case"settings":openSettings();break;
     case"auth":toast("Accounts arrive in the full build. Nothing is saved to a server yet.");break;
+    case"own":{ST.own=ST.own||{};if(ST.own[id]===d.v){delete ST.own[id];toast("Removed from your purchases")}else{ST.own[id]=d.v;toast("Plays from "+d.v+" first")}save();renderDetail();render();break}
     case"svc":{const k=ST.sv.indexOf(d.v);if(k>-1)ST.sv.splice(k,1);else ST.sv.push(d.v);save();renderSettings();render();break}
     case"tv":ST.tv=!ST.tv;save();layout();renderSettings();break;
     case"reset":if(!resetArm){resetArm=true;renderSettings();break}resetAll();break;
