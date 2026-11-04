@@ -1,0 +1,775 @@
+<title>Arena</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: phone gets bottom tabs; iPad, desktop and TV get a left rail. Content is poster rows that swipe sideways. */
+:root{
+  --bg:#0b1526;--bg2:#101e36;--card:#14253f;--line:#25395a;--ink:#eef2f9;--mute:#9aaac4;
+  --acc:#ffb53d;--accink:#0b1526;--chip:#1b3050;--nav:#08111f;--navink:#eef2f9;--navmute:#8fa0ba;
+  --disp:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"DM Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --pw:138px;--rail:92px;color-scheme:dark;
+}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+  --bg:#edf1f7;--bg2:#ffffff;--card:#ffffff;--line:#d2dae8;--ink:#0f1d33;--mute:#56667f;
+  --acc:#b25f00;--accink:#ffffff;--chip:#e2e9f3;color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#edf1f7;--bg2:#ffffff;--card:#ffffff;--line:#d2dae8;--ink:#0f1d33;--mute:#56667f;
+  --acc:#b25f00;--accink:#ffffff;--chip:#e2e9f3;color-scheme:light}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html.tv{font-size:20px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 1rem/1.4 var(--body)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:30}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--acc);outline-offset:3px;border-radius:10px}
+h1,h2,h3{margin:0}
+
+/* shell */
+.main{min-width:0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 110px}
+body.side .main{margin-left:var(--rail);padding-bottom:60px;padding-left:28px;padding-right:28px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0 10px}
+.brand{display:flex;align-items:center;gap:9px;color:var(--acc)}
+.brand svg{width:30px;height:30px;flex:none}
+.brand b{font:700 1.7rem/1 var(--disp);letter-spacing:.08em}
+body.side .top .brand{visibility:hidden}
+.ib{min-width:40px;height:40px;border-radius:12px;background:var(--chip);border:1px solid var(--line);display:inline-grid;place-items:center;font-weight:700;padding:0 8px}
+.ib svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* navigation */
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;background:var(--nav);border-top:1px solid var(--line);
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px))}
+.nav .brand{display:none}
+.nav button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px;border-radius:12px;color:var(--navmute);font-size:.7rem;letter-spacing:.03em}
+.nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button.on{color:var(--acc)}
+body.side .nav{top:0;right:auto;bottom:0;width:var(--rail);flex-direction:column;justify-content:flex-start;gap:6px;border-top:0;border-right:1px solid var(--line);
+  padding:22px 10px 22px max(10px,env(safe-area-inset-left,0px))}
+body.side .nav .brand{display:flex;margin:0 0 18px;justify-content:center;flex-direction:column;gap:4px}
+body.side .nav .brand b{font-size:1.15rem}
+body.side .nav button{flex:none;padding:12px 4px}
+body.side .nav button.on{background:var(--chip)}
+
+/* type */
+.sec{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:26px 0 8px}
+.sec.first{margin-top:6px}
+.sec h2{font:700 1.55rem/1.05 var(--disp);letter-spacing:.04em;text-transform:uppercase}
+.sec small,.mute{color:var(--mute);font-size:.8rem}
+.note{background:var(--chip);border:1px dashed var(--line);color:var(--mute);border-radius:10px;padding:8px 12px;font-size:.8rem;margin:0 0 14px}
+
+/* rows and grids */
+.row{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px 2px 14px;scrollbar-width:thin}
+.row>*{flex:0 0 auto;scroll-snap-align:start}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--pw),1fr));gap:20px 14px}
+.grid.eps{grid-template-columns:repeat(auto-fill,minmax(calc(var(--pw)*1.75),1fr))}
+.grid .card{width:auto}
+
+/* cards */
+.card{width:var(--pw);display:flex;flex-direction:column;gap:5px;min-width:0}
+.card.ep{width:calc(var(--pw)*1.75)}
+.art{position:relative;display:flex;flex-direction:column;justify-content:space-between;gap:8px;aspect-ratio:2/3;width:100%;border-radius:12px;overflow:hidden;color:#fff;text-decoration:none;padding:10px;text-align:left;
+  box-shadow:0 10px 22px rgba(0,0,0,.35);transition:transform .18s ease,box-shadow .18s ease}
+.card.ep .art{aspect-ratio:16/9}
+.art::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.3px) 0 0/5px 5px,linear-gradient(180deg,rgba(0,0,0,0) 30%,rgba(0,0,0,.7))}
+.art>*{position:relative}
+.card:hover .art,.art:focus-visible{transform:translateY(-4px) scale(1.025);box-shadow:0 16px 30px rgba(0,0,0,.5)}
+.tr{display:flex;align-items:flex-start;gap:8px}
+.ic{font-size:1.9rem;line-height:1}
+.seb{font:700 1rem/1 var(--disp);letter-spacing:.06em;background:rgba(0,0,0,.45);padding:4px 7px;border-radius:6px}
+.art b{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font:700 1.25rem/1.02 var(--disp);overflow-wrap:anywhere;text-transform:uppercase;letter-spacing:.02em;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.bt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.sh{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;opacity:.92}
+.art .ph{position:absolute;top:8px;right:8px;font-size:.52rem;letter-spacing:.09em;text-transform:uppercase;background:rgba(0,0,0,.45);padding:2px 5px;border-radius:4px}
+.ct{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left;font-weight:700;font-size:.9rem;line-height:1.2}
+.ct:hover{color:var(--acc)}
+.cm{color:var(--mute);font-size:.76rem;line-height:1.25}
+.cm.svc{color:var(--acc);font-weight:700}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.pill{background:var(--chip);border:1px solid var(--line);border-radius:99px;padding:5px 10px;font-size:.72rem;font-weight:700;white-space:nowrap}
+.pill:hover{border-color:var(--acc)}
+.pill.on,.chip.on{background:var(--acc);color:var(--accink);border-color:var(--acc)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
+.chip{background:var(--chip);border:1px solid var(--line);border-radius:99px;padding:8px 14px;font-size:.86rem;font-weight:500}
+.chip:hover{border-color:var(--acc)}
+.btn{background:var(--acc);color:var(--accink);border-radius:10px;padding:10px 15px;font-weight:700;font-size:.9rem;display:inline-flex;align-items:center;gap:6px;text-decoration:none;border:1px solid var(--acc)}
+.btn.alt{background:var(--chip);color:var(--ink);border-color:var(--line)}
+.btn:hover{filter:brightness(1.08)}
+.in{background:var(--card);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;min-width:0;width:100%}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.bar>*{flex:1 1 130px}
+.bar>.btn{flex:0 0 auto}
+
+/* gradients (art surfaces, same in both themes) */
+.g-halloween{background:linear-gradient(145deg,#ff7a18,#5b1f8f 62%,#150b2b)}
+.g-thanksgiving{background:linear-gradient(145deg,#e0661a,#7a3412 62%,#1e1008)}
+.g-christmas{background:linear-gradient(145deg,#1fa25a,#8a1f2b 62%,#1a0b10)}
+.g-romance{background:linear-gradient(145deg,#ec2f87,#6b21a8 62%,#170a2b)}
+.g-family{background:linear-gradient(145deg,#19b3a6,#1f5fa8 62%,#0c1a33)}
+.g-thriller{background:linear-gradient(145deg,#c0262d,#3a1d3f 62%,#0a0a14)}
+.g-other{background:linear-gradient(145deg,#4a74ad,#24395a 62%,#0b1526)}
+.g-empty{background:var(--chip)}
+
+/* hero + continue */
+.hero{position:relative;border-radius:18px;overflow:hidden;padding:clamp(18px,4vw,36px);min-height:240px;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;color:#fff;box-shadow:0 14px 34px rgba(0,0,0,.4)}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.3px) 0 0/6px 6px,linear-gradient(180deg,rgba(0,0,0,0) 20%,rgba(0,0,0,.65))}
+.hero>*{position:relative}
+.kick{font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700;opacity:.9}
+.hero h1,.dban h1{font:700 clamp(2.1rem,6vw,3.6rem)/.98 var(--disp);text-transform:uppercase;letter-spacing:.02em;text-wrap:balance;max-width:16ch;text-shadow:0 3px 14px rgba(0,0,0,.5)}
+.hero .cm,.dban .cm{color:rgba(255,255,255,.85)}
+.hero .btn.alt,.dban .btn.alt{background:rgba(255,255,255,.18);color:#fff;border-color:transparent}
+.cont{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.cont .collage{width:78px;flex:none}
+.cont>div{flex:1 1 160px;min-width:0}
+.cont b{font:700 1.3rem/1.1 var(--disp);text-transform:uppercase;letter-spacing:.03em}
+
+/* playlist covers */
+.covb{display:block;width:100%;border-radius:12px;box-shadow:0 10px 22px rgba(0,0,0,.35);transition:transform .18s ease}
+.card:hover .covb,.covb:focus-visible{transform:translateY(-4px)}
+.collage{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;aspect-ratio:1;gap:2px;border-radius:12px;overflow:hidden;width:100%}
+.collage i{display:grid;place-items:center;font-style:normal;font-size:1.4rem;min-height:0}
+.newt{aspect-ratio:1;border:2px dashed var(--line);display:grid;place-items:center;font-size:2.2rem;color:var(--acc);box-shadow:none}
+
+/* lists */
+.list{display:flex;flex-direction:column;gap:8px}
+.pr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid var(--line);background:var(--card);border-radius:12px}
+.mini{width:46px;height:46px;border-radius:9px;display:grid;place-items:center;font-size:1.4rem;flex:none}
+.pr .tx{flex:1 1 150px;min-width:0}
+.pr .tx b{display:block;font-size:.95rem;line-height:1.2}
+.pa{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.se{font:700 1.15rem/1 var(--disp);color:var(--acc);letter-spacing:.05em;white-space:nowrap;min-width:3.4rem}
+.head{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:6px 0 14px}
+.head .collage{width:120px;flex:none}
+.head>div{flex:1 1 220px;min-width:0}
+.head h1{font:700 clamp(1.8rem,5vw,2.6rem)/1 var(--disp);text-transform:uppercase;letter-spacing:.03em}
+.sug{background:var(--chip);border:1px solid var(--acc);border-radius:14px;padding:12px;margin:0 0 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sug>div{flex:1 1 200px;min-width:0}
+.empty{border:2px dashed var(--line);border-radius:14px;padding:18px;color:var(--mute);text-align:center}
+.empty .btn{margin-top:10px}
+textarea.in{min-height:110px}
+
+/* overlays */
+.ov{position:fixed;inset:0;z-index:40;background:rgba(4,9,18,.76);overflow-y:auto}
+.dbox{position:relative;width:min(940px,100%);margin:0 auto;background:var(--bg2);min-height:100%;padding-bottom:calc(30px + env(safe-area-inset-bottom,0px))}
+.dban{position:relative;padding:calc(54px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-left,0px)) 20px;display:flex;flex-direction:column;gap:10px;color:#fff;min-height:290px;justify-content:flex-end}
+.dban::before{content:"";position:absolute;inset:0;background:radial-gradient(rgba(255,255,255,.12) 1px,transparent 1.3px) 0 0/6px 6px,linear-gradient(180deg,rgba(0,0,0,.05) 15%,rgba(0,0,0,.7))}
+.dban>*{position:relative}
+.dclose{position:absolute!important;top:calc(10px + env(safe-area-inset-top,0px));right:max(12px,env(safe-area-inset-right,0px));z-index:3;background:rgba(0,0,0,.5);color:#fff;border-color:transparent}
+.dbody{padding:16px max(16px,env(safe-area-inset-left,0px)) 0 max(16px,env(safe-area-inset-left,0px))}
+.pk{position:fixed;inset:0;z-index:50;background:rgba(4,9,18,.66);display:flex;align-items:flex-end;justify-content:center}
+.pkbox{width:min(480px,100%);background:var(--bg2);border:1px solid var(--line);border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));max-height:85%;overflow:auto}
+.pkbox h3{font:700 1.4rem/1.1 var(--disp);text-transform:uppercase;letter-spacing:.04em}
+.toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:99px;font-weight:700;font-size:.88rem;max-width:90vw;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+body.side .toast{bottom:28px;left:calc(50% + var(--rail)/2)}
+
+@media (min-width:768px){
+  :root{--pw:160px}
+  .ov{padding:28px 20px}
+  .dbox{border-radius:20px;min-height:0;overflow:hidden}
+  .pk{align-items:center}.pkbox{border-radius:18px}
+}
+@media (min-width:1100px){
+  :root{--pw:176px}
+  body.side{--rail:216px}
+  body.side .nav button{flex-direction:row;gap:14px;font-size:.98rem;padding:12px 14px}
+  body.side .nav .brand{flex-direction:row;justify-content:flex-start;padding:0 8px}
+  body.side .nav .brand b{font-size:1.7rem}
+}
+@media (min-width:1500px){:root{--pw:200px}}
+html.tv{--pw:220px}
+@media (prefers-reduced-motion:reduce){.art,.covb{transition:none}.card:hover .art,.card:hover .covb{transform:none}}
+.art .pimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.art.hasimg .tr,.art.hasimg .bt{position:relative;z-index:1}
+.card:not(.ep) .art.hasimg .tr,.card:not(.ep) .art.hasimg .bt{display:none}
+.card.ep .art.hasimg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.78))}
+.card.ep .art.hasimg .tr,.card.ep .art.hasimg .bt{z-index:2}
+</style>
+<nav class="nav" id="nav" aria-label="Main">
+  <div class="brand"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 12.5v15l12-7.5z" fill="currentColor"/></svg><b>ARENA</b></div>
+  <button data-go="home"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></button>
+  <button data-go="browse"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg><span>Browse</span></button>
+  <button data-go="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Search</span></button>
+  <button data-go="library"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span>Library</span></button>
+  <button data-go="playlists"><svg viewBox="0 0 24 24"><path d="M4 6h11M4 12h11M4 18h7"/><path d="M18 13.5l4 2.5-4 2.5z"/></svg><span>Playlists</span></button>
+</nav>
+<main class="main" id="main">
+  <div class="top">
+    <div class="brand"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16 12.5v15l12-7.5z" fill="currentColor"/></svg><b>ARENA</b></div>
+    <button class="ib" id="pfb" data-act="settings" aria-label="Profile and settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></button>
+  </div>
+  <div id="view"></div>
+</main>
+<div class="ov" id="ov" hidden></div>
+<div class="pk" id="pk" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script src="catalog.js"></script>
+<script>
+/* ---------- Sample catalog (hand-picked, unverified; replaced by live catalog data in the full build) ---------- */
+const SV=[["Netflix","https://www.netflix.com/search?q="],["Hulu","https://www.hulu.com/search?q="],["Disney+","https://www.disneyplus.com/search?q="],["HBO Max","https://www.hbomax.com/search?q="],["Prime Video","https://www.primevideo.com/search?phrase="],["Peacock","https://www.peacocktv.com/watch/search?q="],["Paramount+","https://www.paramountplus.com/search/?q="],["Apple TV+","https://tv.apple.com/search?term="],["YouTube","https://www.youtube.com/results?search_query="],["Tubi","https://tubitv.com/search/"],["Pluto TV",null],["Plex",null]];
+const SVC=Object.fromEntries(SV);
+const THEMES=["Halloween","Thanksgiving","Christmas","Romance","Family","Thriller"];
+const ICO={Halloween:"🎃",Thanksgiving:"🦃",Christmas:"🎄",Romance:"💘",Family:"🍿",Thriller:"🔦"};
+const BY={},MV=[],SR=[],EP=[];
+const reg=o=>{BY[o.id]=o;return o};
+function mv(title,year,min,th,on,x){const o=reg({id:"m"+(MV.length+1),kind:"movie",title,year,min,themes:th?th.split(","):[],on:on?on.split("|"):null,...x});MV.push(o);return o}
+function sr(title,on){const o=reg({id:"s"+(SR.length+1),kind:"series",title,on:on?on.split("|"):null,themes:[]});SR.push(o);return o}
+function ep(show,s,e,title,year,min,th){const sh=SR.find(x=>x.title===show);const o=reg({id:"e"+(EP.length+1),kind:"episode",series:sh.id,s,e,title,year,min,themes:th?th.split(","):[]});EP.push(o);return o}
+
+/* Halloween */
+mv("Halloweentown",1998,84,"Halloween,Family","Disney+");
+mv("Halloweentown II: Kalabar's Revenge",2001,81,"Halloween,Family","Disney+");
+mv("Halloweentown High",2004,82,"Halloween,Family","Disney+");
+mv("Return to Halloweentown",2006,83,"Halloween,Family","Disney+");
+mv("Hocus Pocus",1993,96,"Halloween,Family","Disney+");
+mv("The Nightmare Before Christmas",1993,76,"Halloween,Christmas,Family","Disney+");
+mv("Casper",1995,100,"Halloween,Family");
+mv("Coraline",2009,100,"Halloween,Family");
+mv("Beetlejuice",1988,92,"Halloween","HBO Max");
+mv("The Addams Family",1991,99,"Halloween,Family");
+mv("Hubie Halloween",2020,102,"Halloween","Netflix");
+mv("Scream",2022,114,"Halloween,Thriller","Paramount+");
+mv("The Conjuring",2013,112,"Halloween,Thriller","HBO Max");
+mv("Halloween",1978,91,"Halloween,Thriller");
+mv("Ghostbusters",1984,105,"Halloween");
+mv("Hotel Transylvania",2012,91,"Halloween,Family");
+mv("Get Out",2017,104,"Halloween,Thriller");
+mv("Corpse Bride",2005,77,"Halloween,Family");
+mv("It's the Great Pumpkin, Charlie Brown",1966,25,"Halloween,Family","Apple TV+");
+mv("Wolfwalkers",2020,103,"Family","Apple TV+");
+mv("Night of the Living Dead",1968,96,"Halloween,Thriller",null,{free:true});
+mv("Nosferatu",1922,94,"Halloween",null,{free:true});
+mv("Carnival of Souls",1962,78,"Halloween,Thriller",null,{free:true});
+mv("The Little Shop of Horrors",1960,72,"Halloween",null,{free:true});
+/* Thanksgiving + Christmas */
+mv("Planes, Trains and Automobiles",1987,93,"Thanksgiving","Paramount+");
+mv("A Charlie Brown Thanksgiving",1973,25,"Thanksgiving,Family","Apple TV+");
+mv("Home Alone",1990,103,"Christmas,Family","Disney+");
+mv("Home Alone 2: Lost in New York",1992,120,"Christmas,Family","Disney+");
+mv("Elf",2003,97,"Christmas,Family","HBO Max");
+mv("Klaus",2019,97,"Christmas,Family","Netflix");
+mv("Happiest Season",2020,102,"Christmas,Romance","Hulu");
+mv("Candy Cane Lane",2023,117,"Christmas,Family","Prime Video");
+mv("Spirited",2022,127,"Christmas","Apple TV+");
+mv("Love Actually",2003,135,"Christmas,Romance");
+mv("A Christmas Story",1983,93,"Christmas,Family");
+mv("This Christmas",2007,117,"Christmas,Romance");
+mv("Die Hard",1988,132,"Christmas,Thriller");
+mv("A Charlie Brown Christmas",1965,25,"Christmas,Family","Apple TV+");
+mv("Santa Claus Conquers the Martians",1964,81,"Christmas",null,{free:true});
+/* Romance */
+mv("Love & Basketball",2000,124,"Romance","Paramount+");
+mv("To All the Boys I've Loved Before",2018,99,"Romance","Netflix");
+mv("Palm Springs",2020,90,"Romance","Hulu");
+mv("Red, White & Royal Blue",2023,118,"Romance","Prime Video");
+mv("Grease",1978,110,"Romance,Family","Paramount+");
+mv("Clueless",1995,97,"Romance","Paramount+");
+mv("The Notebook",2004,123,"Romance");
+mv("Love Jones",1997,109,"Romance");
+mv("The Best Man",1999,120,"Romance");
+mv("Brown Sugar",2002,109,"Romance");
+mv("10 Things I Hate About You",1999,97,"Romance");
+mv("His Girl Friday",1940,92,"Romance",null,{free:true});
+mv("Charade",1963,113,"Romance,Thriller",null,{free:true});
+/* Essentials sample titles */
+mv("Do the Right Thing",1989,120,"");
+mv("Malcolm X",1992,202,"");
+mv("Crooklyn",1994,115,"");
+mv("Inside Man",2006,129,"Thriller");
+mv("BlacKkKlansman",2018,135,"");
+mv("Da 5 Bloods",2020,154,"","Netflix");
+mv("She's Gotta Have It",1986,84,"Romance");
+mv("25th Hour",2002,135,"");
+mv("Boomerang",1992,117,"Romance");
+mv("Bulworth",1998,108,"");
+mv("Introducing Dorothy Dandridge",1999,115,"");
+mv("Monster's Ball",2001,111,"");
+mv("X-Men",2000,104,"");
+mv("Die Another Day",2002,133,"Thriller");
+mv("Cloud Atlas",2012,172,"");
+mv("Bruised",2020,129,"","Netflix");
+
+/* Series with exact episodes (season and episode numbers are sample data) */
+sr("The Simpsons","Disney+");
+ep("The Simpsons",1,1,"Simpsons Roasting on an Open Fire",1989,22,"Christmas,Family");
+ep("The Simpsons",2,3,"Treehouse of Horror",1990,22,"Halloween");
+ep("The Simpsons",6,6,"Treehouse of Horror V",1994,22,"Halloween");
+sr("The Office","Peacock");
+ep("The Office",2,5,"Halloween",2005,22,"Halloween");
+ep("The Office",2,10,"Christmas Party",2005,22,"Christmas");
+ep("The Office",2,22,"Casino Night",2006,44,"Romance");
+ep("The Office",3,10,"A Benihana Christmas",2006,44,"Christmas");
+ep("The Office",6,9,"Thanksgiving",2009,22,"Thanksgiving");
+ep("The Office",7,6,"Costume Contest",2010,22,"Halloween");
+ep("The Office",7,11,"Classy Christmas",2010,44,"Christmas");
+sr("Friends","HBO Max");
+ep("Friends",1,9,"The One Where Underdog Gets Away",1994,22,"Thanksgiving");
+ep("Friends",5,8,"The One with All the Thanksgivings",1998,22,"Thanksgiving");
+ep("Friends",5,14,"The One Where Everybody Finds Out",1999,22,"Romance");
+ep("Friends",6,6,"The One with the Halloween Party",1999,22,"Halloween");
+ep("Friends",7,10,"The One with the Holiday Armadillo",2000,22,"Christmas");
+sr("Brooklyn Nine-Nine","Peacock");
+ep("Brooklyn Nine-Nine",1,6,"Halloween",2013,22,"Halloween");
+ep("Brooklyn Nine-Nine",1,9,"Thanksgiving",2013,22,"Thanksgiving");
+ep("Brooklyn Nine-Nine",2,4,"Halloween II",2014,22,"Halloween");
+ep("Brooklyn Nine-Nine",3,4,"Halloween III",2015,22,"Halloween");
+sr("Buffy the Vampire Slayer","Hulu");
+ep("Buffy the Vampire Slayer",2,6,"Halloween",1997,44,"Halloween,Thriller");
+sr("Modern Family","Hulu");
+ep("Modern Family",1,6,"Halloween",2009,22,"Halloween,Family");
+sr("Community");
+ep("Community",2,6,"Epidemiology",2010,22,"Halloween");
+ep("Community",3,10,"Abed's Uncontrollable Christmas",2011,22,"Christmas");
+sr("The Twilight Zone","Paramount+");
+ep("The Twilight Zone",5,3,"Nightmare at 20,000 Feet",1963,25,"Halloween,Thriller");
+sr("Seinfeld","Netflix");
+ep("Seinfeld",9,10,"The Strike",1997,22,"Christmas");
+sr("How I Met Your Mother");
+ep("How I Met Your Mother",1,7,"Slutty Pumpkin",2005,22,"Halloween,Romance");
+sr("Goosebumps");
+ep("Goosebumps",1,1,"The Haunted Mask",1995,22,"Halloween,Family");
+
+/* Real data: merge TMDB details and Watchmode availability (app/catalog.js) into the curated titles. */
+(function(){const C=window.CATALOG;if(!C)return;
+ MV.forEach(o=>{const c=C.movies[o.title+"|"+o.year];if(c)Object.assign(o,{tmdb:c.tmdb,year:c.year,min:c.min||o.min,ov:c.ov,img:c.img,trailer:c.trailer,src:c.src,real:true})});
+ SR.forEach(o=>{const c=C.shows[o.title];if(c)Object.assign(o,{tmdb:c.tmdb,ov:c.ov,img:c.img,src:c.src,real:true})});
+ EP.forEach(o=>{const c=C.episodes[BY[o.series].title+"|"+o.s+"|"+o.e];if(c)Object.assign(o,{s0:o.s,e0:o.e,s:c.s,e:c.e,title:c.title,year:c.year||o.year,min:c.min||o.min,ov:c.ov,img:c.img,real:true})});
+})();
+const checkedOn=()=>window.CATALOG?new Date(window.CATALOG.checked+"T12:00:00").toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"";
+
+/* Sample collections. Not real community or editorial data. */
+const mq=t=>MV.find(x=>x.title===t).id;
+const eq=(sh,s,e)=>EP.find(x=>BY[x.series].title===sh&&(x.s0??x.s)===s&&(x.e0??x.e)===e).id;
+const ESS=[
+ {id:"c-spike",name:"Spike Lee Essentials",by:"Sample editorial",refs:[mq("Do the Right Thing"),mq("Malcolm X"),mq("Crooklyn"),mq("Inside Man"),mq("BlacKkKlansman"),mq("Da 5 Bloods"),mq("She's Gotta Have It"),mq("25th Hour")]},
+ {id:"c-halle",name:"Halle Berry Essentials",by:"Sample editorial",refs:[mq("Boomerang"),mq("Bulworth"),mq("Introducing Dorothy Dandridge"),mq("Monster's Ball"),mq("X-Men"),mq("Die Another Day"),mq("Cloud Atlas"),mq("Bruised")]}
+];
+const POP=[
+ {id:"c-hw",name:"Halloween Night",by:"Sample playlist",refs:[mq("Halloweentown"),mq("Hocus Pocus"),eq("The Simpsons",2,3),eq("The Office",2,5),eq("Buffy the Vampire Slayer",2,6)]},
+ {id:"c-tg",name:"Thanksgiving Table",by:"Sample playlist",refs:[mq("A Charlie Brown Thanksgiving"),eq("Friends",5,8),eq("The Office",6,9),eq("Brooklyn Nine-Nine",1,9),mq("Planes, Trains and Automobiles")]},
+ {id:"c-xm",name:"Cozy Christmas",by:"Sample playlist",refs:[mq("Home Alone"),mq("Elf"),eq("The Office",2,10),eq("Friends",7,10),mq("Klaus")]},
+ {id:"c-dn",name:"Date Night",by:"Sample playlist",refs:[mq("Love & Basketball"),mq("Love Jones"),eq("Friends",5,14),eq("The Office",2,22),mq("The Best Man")]},
+ {id:"c-fm",name:"Family Movie Night",by:"Sample playlist",refs:[mq("Hotel Transylvania"),mq("Coraline"),mq("Casper"),mq("Elf"),mq("Klaus")]}
+];
+const COLS=ESS.concat(POP);
+</script>
+<script>
+/* ---------- State and helpers ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const decOf=y=>Math.floor(y/10)*10;
+const fmtMin=m=>m>=60?Math.floor(m/60)+"h"+(m%60?" "+(m%60)+"m":""):m+" min";
+const ST={pl:[],lib:[],recent:[],sv:[],custom:[],pid:1,cid:1,tv:false};
+const KEY="arena2";
+let view="home",dview=null,bTheme="",bRT="",sQ="",sKind="all",sRT="",sDC="",sSort="az",libF="all",suggest=null,shareTxt="",delArm=null,resetArm=false;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(ST))}catch(e){}}
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s)Object.assign(ST,s)}catch(e){}
+  ST.custom.forEach(o=>{reg(o);(o.kind==="movie"?MV:o.kind==="series"?SR:EP).push(o)});
+}
+const plOf=id=>ST.pl.find(p=>p.id===id);
+const colOf=id=>COLS.find(c=>c.id===id);
+const inLib=id=>ST.lib.some(x=>x.id===id);
+const plCountOf=id=>ST.pl.filter(p=>p.items.includes(id)).length;
+const themesOf=it=>it.kind==="series"?[...new Set(EP.filter(e=>e.series===it.id).flatMap(e=>e.themes))]:(it.themes||[]).filter(Boolean);
+const yearOf=it=>{if(it.kind==="series"){const y=EP.filter(e=>e.series===it.id).map(e=>e.year);return y.length?Math.min(...y):0}return it.year||0};
+const gOf=it=>"g-"+((themesOf(it)[0]||"other").toLowerCase());
+const icOf=it=>ICO[themesOf(it)[0]]||"🎞️";
+const epsOf=id=>EP.filter(e=>e.series===id).sort((a,b)=>a.s-b.s||a.e-b.e);
+const se=it=>"S"+it.s+" · E"+it.e;
+const label=it=>it.kind==="episode"?BY[it.series].title+" "+se(it)+" · "+it.title:it.title;
+const onOf=it=>it.kind==="episode"?BY[it.series].on:it.on;
+const freeOf=it=>it.kind==="episode"?false:!!it.free;
+const qOf=it=>it.kind==="episode"?BY[it.series].title+" "+it.title:it.title+(it.free?" full movie":"");
+const srcOf=it=>it.kind==="episode"?(BY[it.series].src||null):(it.src||null);
+const VIAOPT={"HBO Max":["Hulu","Prime Video"],"Peacock":["Prime Video"],"Hulu":["Disney+"],"Paramount+":["Prime Video"]};
+function pickSrc(srcs){
+  const mine=ST.sv,via=ST.via||{};
+  const yours=s=>!s.free&&mine.includes(s.svc)&&(via[s.svc]||null)===(s.via||null);
+  return srcs.find(yours)||srcs.find(s=>s.free&&mine.includes(s.svc))||srcs.find(s=>s.free)||null;
+}
+function target(it){
+  const srcs=srcOf(it);
+  if(srcs){
+    const q=it.kind==="episode"?BY[it.series].title:it.title;
+    if(!srcs.length)return{n:"JustWatch",u:"https://www.justwatch.com/us/search?q="+encodeURIComponent(q),ok:false};
+    const p=pickSrc(srcs),via=ST.via||{};
+    if(!p){/* you get this service as an add-on, but the data only lists its own app: check inside the add-on's app */
+      const h=srcs.find(x=>ST.sv.includes(x.svc)&&via[x.svc]&&SVC[via[x.svc]]);
+      if(h)return{n:via[h.svc],u:SVC[via[h.svc]]+encodeURIComponent(q),ok:true,search:true,check:true};
+    }
+    const s=p||srcs[0],app=s.via||s.svc;
+    if(it.kind!=="episode")return{n:s.via?s.svc+" in "+s.via:s.svc,u:s.u,ok:!!p};
+    const base=SVC[app];
+    return{n:app,u:base?base+encodeURIComponent(BY[it.series].title):s.u,ok:!!p,search:true};
+  }
+  return oldTarget(it);
+}
+const openLbl=t=>"▶ "+(t.check?"Check ":t.search?"Search in ":"Open in ")+esc(t.n);
+function oldTarget(it){
+  let n;const mine=ST.sv;
+  if(freeOf(it)) n=(mine.includes("Tubi")&&!mine.includes("YouTube"))?"Tubi":"YouTube";
+  else{const on=onOf(it);n=on?(on.find(x=>mine.includes(x))||on[0]):mine.find(x=>x!=="YouTube"&&x!=="Tubi")}
+  return n?{n,u:SVC[n]+encodeURIComponent(qOf(it))}:{n:"JustWatch",u:"https://www.justwatch.com/us/search?q="+encodeURIComponent(qOf(it))};
+}
+const trailerUrl=it=>it.trailer?"https://www.youtube.com/watch?v="+it.trailer:"https://www.youtube.com/results?search_query="+encodeURIComponent((it.kind==="episode"?BY[it.series].title+" "+it.title:it.title+(it.year?" "+it.year:""))+" official trailer");
+let tt;function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>{t.hidden=true},2800)}
+
+/* ---------- Library and playlist actions (independent of each other) ---------- */
+function libToggle(id){
+  const k=ST.lib.findIndex(x=>x.id===id);
+  if(k>-1){ST.lib.splice(k,1);toast("Removed from Library")}else{ST.lib.push({id,t:Date.now()});toast("Saved to Library")}
+  save();refreshSave(id);
+  if(view==="library"&&!dview&&$("ov").hidden)render();
+}
+function refreshSave(id){
+  document.querySelectorAll('[data-act="save"][data-id="'+id+'"]').forEach(b=>{const on=inLib(id);b.classList.toggle("on",on);b.textContent=on?"♥ Saved":"♡ Save"});
+}
+function plCreate(name,first){
+  name=name.trim();if(!name)return null;
+  const p={id:"p"+ST.pid++,name,items:first?[first]:[],made:Date.now()};ST.pl.push(p);save();return p;
+}
+function touchRecent(id){ST.recent=ST.recent.filter(r=>r.id!==id);ST.recent.unshift({id,t:Date.now()});ST.recent=ST.recent.slice(0,12);save()}
+
+/* ---------- Cards ---------- */
+function pills(it){
+  const sv=inLib(it.id);
+  return `<div class="pills"><button class="pill${sv?" on":""}" data-act="save" data-id="${it.id}">${sv?"♥ Saved":"♡ Save"}</button>`+
+    (it.kind==="series"?`<button class="pill" data-act="detail" data-id="${it.id}">Episodes ›</button>`:`<button class="pill" data-act="addpl" data-id="${it.id}">+ Playlist</button>`)+`</div>`;
+}
+function cardX(it,extra){
+  const ep=it.kind==="episode",ser=it.kind==="series",t=ser?null:target(it);
+  const inner=`${it.img?`<img class="pimg" src="${it.img}" alt="" loading="lazy" onerror="this.remove()">`:""}<span class="tr"><span class="ic">${icOf(it)}</span>${ep?`<span class="seb">${se(it)}</span>`:""}</span><span class="bt">${ep?`<span class="sh">${esc(BY[it.series].title)}</span>`:""}<b>${esc(it.title)}</b></span>${it.img?"":`<span class="ph">Sample art</span>`}`;
+  const art=ser?`<button class="art ${gOf(it)}${it.img?" hasimg":""}" data-act="detail" data-id="${it.id}" aria-label="Choose an episode of ${esc(it.title)}">${inner}</button>`
+    :`<a class="art ${gOf(it)}${it.img?" hasimg":""}" href="${t.u}" target="_blank" rel="noopener" aria-label="Open ${esc(label(it))} in ${esc(t.n)}">${inner}</a>`;
+  const m=ep?esc(BY[it.series].title)+" · "+se(it):ser?"Series · "+epsOf(it.id).length+" ep.":it.year+" · "+fmtMin(it.min);
+  return `<div class="card${ep?" ep":""}">${art}<button class="ct" data-act="detail" data-id="${it.id}">${esc(it.title)}</button><div class="cm">${m}</div>`+
+    (t?`<div class="cm svc">▶ ${t.check?"Check ":""}${esc(t.n)}${t.ok===false?" · not in My Services":""}</div>`:`<div class="cm svc">Pick an episode</div>`)+(extra||"")+pills(it)+`</div>`;
+}
+const card=it=>cardX(it,"");
+const libCard=it=>{const n=plCountOf(it.id);return cardX(it,`<div class="cm">${n?"In "+n+" playlist"+(n>1?"s":""):"Not in a playlist"}</div>`)};
+function collage(refs){
+  let h="";for(let i=0;i<4;i++){const it=BY[refs[i]];h+=it?(it.img?`<i class="${gOf(it)}" style="background:center/cover url('${it.img}')"></i>`:`<i class="${gOf(it)}">${icOf(it)}</i>`):`<i class="g-empty"></i>`}
+  return `<span class="collage">${h}</span>`;
+}
+function covCard(p,type){
+  const act=type==="pl"?"openpl":"opencol",n=type==="pl"?p.items.length:p.refs.length;
+  const sub=type==="pl"?n+" title"+(n===1?"":"s"):esc(p.by)+" · "+n+" titles";
+  return `<div class="card cov"><button class="covb" data-act="${act}" data-id="${p.id}" aria-label="Open ${esc(p.name)}">${collage(type==="pl"?p.items:p.refs)}</button><button class="ct" data-act="${act}" data-id="${p.id}">${esc(p.name)}</button><div class="cm">${sub}</div></div>`;
+}
+const rowSec=(title,sub,html)=>`<div class="sec"><h2>${title}</h2>${sub?`<small>${sub}</small>`:""}</div><div class="row">${html}</div>`;
+function tonight(){
+  const m=new Date().getMonth(),th=m===9?"Halloween":m===10?"Thanksgiving":m===11?"Christmas":m===1?"Romance":null;
+  const all=[...MV,...EP].filter(x=>th?x.themes.includes(th):x.themes.length);
+  return {it:all[new Date().getDate()%all.length],th};
+}
+function sugBanner(src){
+  if(!suggest||suggest.src!==src)return"";
+  const it=BY[suggest.id];if(!it)return"";const t=it.kind==="series"?null:target(it);
+  return `<div class="sug"><div><b>How about this one?</b><div class="cm">${esc(label(it))}</div><div class="cm">A random pick. Arena does not start playback across apps.</div></div>`+
+    (t?`<a class="btn" href="${t.u}" target="_blank" rel="noopener">${openLbl(t)}</a>`:"")+
+    `<button class="btn alt" data-act="detail" data-id="${it.id}">Details</button><button class="btn alt" data-act="suggest" data-src="${src}">Another</button></div>`;
+}
+const totalMin=items=>items.reduce((s,x)=>s+(x.min||0),0);
+
+/* ---------- Views ---------- */
+function home(){
+  const {it,th}=tonight(),t=target(it);
+  const rec=ST.recent.map(r=>plOf(r.id)).filter(Boolean);
+  let h=`<div class="note">Prototype with a small hand-picked sample catalog. Artwork is placeholder art, and links open each service's search page.</div>`;
+  h+=`<section class="hero ${gOf(it)}"><span class="kick">Tonight's pick${th?" · "+th:""}</span><h1>${esc(it.kind==="episode"?BY[it.series].title+": "+it.title:it.title)}</h1><div class="cm">${esc(it.kind==="episode"?se(it)+" · ":it.year+" · ")+fmtMin(it.min)} · placeholder art</div>`+
+    `<div class="pills"><a class="btn" href="${t.u}" target="_blank" rel="noopener">${openLbl(t)}</a><button class="btn alt" data-act="detail" data-id="${it.id}">Details</button><button class="btn alt" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button><button class="btn alt" data-act="addpl" data-id="${it.id}">+ Playlist</button></div></section>`;
+  h+=`<div class="sec"><h2>Continue your playlist</h2><small>Returns to a lineup you opened</small></div>`;
+  if(rec[0]){const p=rec[0];h+=`<div class="cont">${collage(p.items)}<div><b>${esc(p.name)}</b><div class="cm">${p.items.length} title${p.items.length===1?"":"s"} · you decide what to open next</div></div><button class="btn" data-act="openpl" data-id="${p.id}">Open playlist</button></div>`}
+  else h+=`<div class="empty">No playlists opened yet. Tap + Playlist on any title to start one.<br><button class="btn" data-act="go" data-v="playlists">Make a playlist</button></div>`;
+  if(rec.length>1)h+=rowSec("Recently opened playlists","",rec.map(p=>covCard(p,"pl")).join(""));
+  h+=rowSec("Your playlists",ST.pl.length+" total",ST.pl.map(p=>covCard(p,"pl")).join("")+`<div class="card cov"><button class="covb newt" data-act="go" data-v="playlists" aria-label="Create a playlist">＋</button><div class="ct">New playlist</div><div class="cm">Name it yourself</div></div>`);
+  h+=rowSec("Popular playlists","Sample data, not real community picks",POP.map(c=>covCard(c,"col")).join(""));
+  h+=rowSec("Essentials","Sample editorial collections",ESS.map(c=>covCard(c,"col")).join(""));
+  return h;
+}
+const pool=v=>{const all=[...MV,...EP];return v.startsWith("d")?all.filter(x=>decOf(x.year)===+v.slice(1)):all.filter(x=>x.themes.includes(v))};
+const rtOk=(it,f)=>{if(!f)return true;const m=it.min;return f==="short"?m<=30:f==="hour"?(m>30&&m<=70):m>=75};
+const rtSel=(id,val)=>`<select class="in" id="${id}" aria-label="Runtime"><option value="">Any length</option><option value="short"${val==="short"?" selected":""}>About 22 min</option><option value="hour"${val==="hour"?" selected":""}>About an hour</option><option value="feat"${val==="feat"?" selected":""}>Feature length</option></select>`;
+function browse(){
+  const decs=[...new Set([...MV,...EP].map(x=>decOf(x.year)))].sort();
+  const chip=(v,l)=>`<button class="chip${bTheme===v?" on":""}" data-act="btheme" data-v="${v}">${l}</button>`;
+  let h=`<div class="sec first"><h2>Browse</h2><small>Themed collections</small></div><div class="chips">${chip("","All")}${THEMES.map(t=>chip(t,ICO[t]+" "+t)).join("")}${decs.map(d=>chip("d"+d,d+"s")).join("")}</div>`;
+  if(!bTheme){
+    THEMES.forEach(t=>{
+      const p=pool(t),m=p.filter(x=>x.kind==="movie"),e=p.filter(x=>x.kind==="episode");
+      if(m.length)h+=rowSec(t+" movies",m.length+" titles",m.map(x=>card(x)).join(""));
+      if(e.length)h+=rowSec(t+" episodes",e.length+" episodes",e.map(x=>card(x)).join(""));
+    });
+    [1990,2000].forEach(d=>{const m=MV.filter(x=>decOf(x.year)===d);if(m.length>3)h+=rowSec("Throwback · "+d+"s movies",m.length+" titles",m.map(x=>card(x)).join(""))});
+  }else{
+    const p=pool(bTheme).filter(x=>rtOk(x,bRT)),m=p.filter(x=>x.kind==="movie"),e=p.filter(x=>x.kind==="episode");
+    h+=`<div class="bar">${rtSel("brt",bRT)}</div>`;
+    if(m.length)h+=`<div class="sec"><h2>Movies</h2><small>${m.length}</small></div><div class="grid">${m.map(x=>card(x)).join("")}</div>`;
+    if(e.length)h+=`<div class="sec"><h2>Episodes</h2><small>${e.length}</small></div><div class="grid eps">${e.map(x=>card(x)).join("")}</div>`;
+    if(!m.length&&!e.length)h+=`<div class="empty">Nothing in this collection matches that length.</div>`;
+  }
+  return h;
+}
+function search(){
+  const kinds=[["all","All"],["film","Films"],["series","Series"],["season","Seasons"],["episode","Episodes"]];
+  const decs=[...new Set([...MV,...EP].map(x=>decOf(x.year)))].sort();
+  return `<div class="sec first"><h2>Search</h2><small>Films, series, seasons, episodes</small></div>`+
+    `<input class="in" id="q" type="search" placeholder="Titles, shows, or themes like halloween" value="${esc(sQ)}" aria-label="Search the catalog" autocomplete="off">`+
+    `<div class="chips">${kinds.map(k=>`<button class="chip${sKind===k[0]?" on":""}" data-act="skind" data-v="${k[0]}">${k[1]}</button>`).join("")}</div>`+
+    `<div class="bar">${rtSel("srt",sRT)}<select class="in" id="sdc" aria-label="Decade"><option value="">Any decade</option>${decs.map(d=>`<option value="${d}"${String(d)===sDC?" selected":""}>${d}s</option>`).join("")}</select>`+
+    `<select class="in" id="sso" aria-label="Sort"><option value="az"${sSort==="az"?" selected":""}>Title A–Z</option><option value="old"${sSort==="old"?" selected":""}>Oldest first</option><option value="new"${sSort==="new"?" selected":""}>Newest first</option></select></div>`+
+    `<div id="sres">${sres()}</div>`;
+}
+function sres(){
+  const q=sQ.trim().toLowerCase();
+  if(!q&&!sRT&&!sDC)return `<div class="empty">Search the whole sample catalog. Results are grouped as films, series, seasons and episodes.<div class="chips" style="justify-content:center;margin:12px 0 0">${["halloween","office","friends","romance","christmas"].map(s=>`<button class="chip" data-act="sq" data-v="${s}">${s}</button>`).join("")}</div></div>`;
+  const words=q.split(/\s+/).filter(Boolean);
+  const hay=it=>it.kind==="episode"?(it.title+" "+BY[it.series].title+" "+it.themes.join(" ")+" season "+it.s+" episode "+it.e+" s"+it.s+"e"+it.e).toLowerCase():(it.title+" "+themesOf(it).join(" ")+(it.year?" "+it.year:"")).toLowerCase();
+  const match=it=>words.every(w=>hay(it).includes(w));
+  const dcOk=it=>!sDC||decOf(it.year)===+sDC;
+  const epOk=e=>dcOk(e)&&rtOk(e,sRT);
+  const films=MV.filter(x=>match(x)&&epOk(x)),eps=EP.filter(x=>match(x)&&epOk(x));
+  const ser=SR.filter(x=>match(x)&&epsOf(x.id).some(epOk));
+  const seasons=[];
+  if(q)SR.forEach(s=>{[...new Set(epsOf(s.id).map(e=>e.s))].forEach(n=>{
+    const es=epsOf(s.id).filter(e=>e.s===n&&epOk(e));
+    const hs=(s.title+" season "+n+" "+[...new Set(es.flatMap(e=>e.themes))].join(" ")).toLowerCase();
+    if(es.length&&words.every(w=>hs.includes(w)))seasons.push({kind:"season",series:s.id,s:n,title:s.title+" · Season "+n,year:Math.min(...es.map(e=>e.year)),count:es.length});
+  })});
+  const sorter=sSort==="old"?(a,b)=>yearOf(a)-yearOf(b):sSort==="new"?(a,b)=>yearOf(b)-yearOf(a):(a,b)=>a.title.localeCompare(b.title);
+  const show=k=>sKind==="all"||sKind===k;
+  const sec=(t,n,body)=>n?`<div class="sec"><h2>${t}</h2><small>${n}</small></div>${body}`:"";
+  let h="";
+  if(show("film"))h+=sec("Films",films.length,`<div class="grid">${films.sort(sorter).map(x=>card(x)).join("")}</div>`);
+  if(show("series"))h+=sec("Series",ser.length,`<div class="grid">${ser.sort(sorter).map(x=>card(x)).join("")}</div>`);
+  if(show("season"))h+=sec("Seasons",seasons.length,`<div class="list">${seasons.sort(sorter).map(s=>`<div class="pr"><span class="mini g-other">📺</span><div class="tx"><b>${esc(s.title)}</b><span class="cm">${s.count} sample episode${s.count===1?"":"s"}</span></div><div class="pa"><button class="pill" data-act="detail" data-id="${s.series}" data-season="${s.s}">View episodes ›</button></div></div>`).join("")}</div>`);
+  if(show("episode"))h+=sec("Episodes",eps.length,`<div class="grid eps">${eps.sort(sorter).map(x=>card(x)).join("")}</div>`);
+  return h||`<div class="empty">No matches. Try another word or loosen a filter.</div>`;
+}
+function addForm(){
+  return `<details style="margin-top:28px"><summary>+ Add your own title</summary><div style="margin-top:10px">`+
+    `<div class="bar"><select class="in" id="ak" aria-label="Kind"><option value="movie">Movie</option><option value="episode">Episode</option></select><input class="in" id="as" placeholder="Show (episodes only)"><input class="in" id="at" placeholder="Title"></div>`+
+    `<div class="bar"><input class="in" id="asn" type="number" min="1" placeholder="Season"><input class="in" id="aen" type="number" min="1" placeholder="Episode"><input class="in" id="ay" type="number" min="1900" max="2100" placeholder="Year"><input class="in" id="am" type="number" min="1" placeholder="Minutes"><select class="in" id="ath" aria-label="Theme">${THEMES.concat(["Other"]).map(t=>`<option>${t}</option>`).join("")}</select></div>`+
+    `<button class="btn" data-act="addcustom">Add to catalog and Library</button></div></details>`;
+}
+function library(){
+  const chips=[["all","All"],["movie","Movies"],["series","Shows"],["episode","Episodes"],["recent","Recently added"]];
+  let items=[...ST.lib].sort((a,b)=>b.t-a.t).map(x=>BY[x.id]).filter(Boolean);
+  const total=items.length;
+  if(libF==="recent")items=items.slice(0,8);
+  const m=items.filter(x=>x.kind==="movie"),s=items.filter(x=>x.kind==="series"),e=items.filter(x=>x.kind==="episode");
+  const show=k=>libF==="all"||libF==="recent"||libF===k;
+  let h=`<div class="sec first"><h2>Library</h2><small>${total} saved · saved titles do not need a playlist</small></div>`;
+  h+=`<div class="chips">${chips.map(c=>`<button class="chip${libF===c[0]?" on":""}" data-act="lf" data-v="${c[0]}">${c[1]}</button>`).join("")}</div>`;
+  if(total)h+=`<div class="bar"><button class="btn alt" data-act="suggest" data-src="lib">🎲 Pick one for me</button></div>`+sugBanner("lib");
+  if(!total)h+=`<div class="empty">Your Library is empty. Tap ♡ Save on any title in Browse or Search. Saving does not add it to a playlist, and playlists do not need a saved title.<br><button class="btn" data-act="go" data-v="browse">Browse titles</button></div>`;
+  if(show("movie")&&m.length)h+=`<div class="sec"><h2>Movies</h2><small>${m.length}</small></div><div class="grid">${m.map(libCard).join("")}</div>`;
+  if(show("series")&&s.length)h+=`<div class="sec"><h2>Shows</h2><small>${s.length}</small></div><div class="grid">${s.map(libCard).join("")}</div>`;
+  if(show("episode")&&e.length)h+=`<div class="sec"><h2>Episodes</h2><small>${e.length}</small></div><div class="grid eps">${e.map(libCard).join("")}</div>`;
+  return h+addForm();
+}
+function playlists(){
+  let h=`<div class="sec first"><h2>Playlists</h2><small>${ST.pl.length} lineup${ST.pl.length===1?"":"s"}</small></div>`;
+  h+=`<div class="bar"><input class="in" id="npn" placeholder="Name a new playlist: Romance, Soccer Mom, Comfort Shows" aria-label="New playlist name"><button class="btn" data-act="newpl0">Create</button></div>`;
+  if(ST.pl.length)h+=`<div class="grid">${ST.pl.map(p=>covCard(p,"pl")).join("")}</div>`;
+  else h+=`<div class="empty">No playlists yet. Name one above, or tap + Playlist on any title. You can also copy a sample below.</div>`+rowSec("Start from a sample","Sample playlists",POP.map(c=>covCard(c,"col")).join(""));
+  return h;
+}
+function plDetail(id){
+  const p=plOf(id),items=p.items.map(r=>BY[r]).filter(Boolean);
+  let h=`<button class="btn alt" data-act="back">← Playlists</button>`;
+  h+=`<div class="head">${collage(p.items)}<div><h1>${esc(p.name)}</h1><div class="cm">${items.length} title${items.length===1?"":"s"} · about ${fmtMin(totalMin(items))} · you set the order</div></div></div>`;
+  h+=`<div class="bar"><input class="in" id="rn" value="${esc(p.name)}" aria-label="Playlist name"><button class="btn alt" data-act="ren">Rename</button><button class="btn alt" data-act="suggest" data-src="pl">🎲 Pick one for me</button><button class="btn alt" data-act="copylist">Copy list</button><button class="btn alt" data-act="delpl">${delArm===p.id?"Tap again to delete":"Delete playlist"}</button></div>`;
+  if(shareTxt)h+=`<textarea class="in" id="sharebox" readonly aria-label="Playlist text">${esc(shareTxt)}</textarea>`;
+  h+=sugBanner("pl");
+  if(!items.length)return h+`<div class="empty">This playlist is empty. Go to Browse or Search and tap + Playlist on a title.<br><button class="btn" data-act="go" data-v="browse">Browse titles</button></div>`;
+  h+=`<div class="list">`+items.map((it,i)=>{
+    const t=target(it),ep=it.kind==="episode";
+    return `<div class="pr"><span class="se">${ep?"S"+it.s+" E"+it.e:"FILM"}</span><span class="mini ${gOf(it)}">${icOf(it)}</span><div class="tx"><b>${esc(it.title)}</b><span class="cm">${ep?esc(BY[it.series].title)+" · ":""}${it.year} · ${fmtMin(it.min)} · ${esc(t.n)}</span></div>`+
+      `<div class="pa"><a class="btn" href="${t.u}" target="_blank" rel="noopener">▶ Open</a><button class="pill${inLib(it.id)?" on":""}" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button>`+
+      `<button class="ib" data-act="mv" data-i="${i}" data-d="-1" aria-label="Move up"${i===0?" disabled":""}>↑</button><button class="ib" data-act="mv" data-i="${i}" data-d="1" aria-label="Move down"${i===items.length-1?" disabled":""}>↓</button><button class="ib" data-act="rm" data-i="${i}" aria-label="Remove from playlist">✕</button></div></div>`;
+  }).join("")+`</div><p class="cm" style="margin-top:12px">Removing a title here keeps it in your Library and your other playlists. Each Open button launches that service's search page; exact-episode launching still needs testing on real devices.</p>`;
+  return h;
+}
+function colDetail(id){
+  const c=colOf(id),items=c.refs.map(r=>BY[r]).filter(Boolean);
+  const m=items.filter(x=>x.kind==="movie"),e=items.filter(x=>x.kind==="episode");
+  let h=`<button class="btn alt" data-act="back">← Back</button>`;
+  h+=`<div class="head">${collage(c.refs)}<div><h1>${esc(c.name)}</h1><div class="cm">${esc(c.by)} · ${items.length} titles · about ${fmtMin(totalMin(items))}</div><div class="cm">Sample curation for this prototype. Not an official, licensed or community list.</div></div></div>`;
+  h+=`<div class="bar"><button class="btn" data-act="copycol" data-id="${c.id}">Copy to my playlists</button></div>`;
+  if(m.length)h+=`<div class="sec"><h2>Movies</h2><small>${m.length}</small></div><div class="grid">${m.map(x=>card(x)).join("")}</div>`;
+  if(e.length)h+=`<div class="sec"><h2>Episodes</h2><small>${e.length}</small></div><div class="grid eps">${e.map(x=>card(x)).join("")}</div>`;
+  return h;
+}
+const VIEWS={home,browse,search,library,playlists};
+function render(){
+  document.querySelectorAll("#nav [data-go]").forEach(b=>b.classList.toggle("on",b.dataset.go===view));
+  let h;
+  if(dview&&dview.t==="pl"&&plOf(dview.id))h=plDetail(dview.id);
+  else if(dview&&dview.t==="col"&&colOf(dview.id))h=colDetail(dview.id);
+  else{dview=null;h=VIEWS[view]()}
+  $("view").innerHTML=h;
+}
+</script>
+<style>
+summary{cursor:pointer;color:var(--acc);font-weight:700}
+.sechead{font:700 1.6rem/1.05 var(--disp);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 8px}
+.dbody p{max-width:62ch}
+.art .pimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.art.hasimg .tr,.art.hasimg .bt{position:relative;z-index:1}
+.card:not(.ep) .art.hasimg .tr,.card:not(.ep) .art.hasimg .bt{display:none}
+.card.ep .art.hasimg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 35%,rgba(0,0,0,.78))}
+.card.ep .art.hasimg .tr,.card.ep .art.hasimg .bt{z-index:2}
+</style>
+<script>
+/* ---------- Overlays: title detail, playlist picker, settings ---------- */
+let ovMode=null,ovId=null,ovSeason=null,pkId=null;
+function showOv(){$("ov").hidden=false;$("ov").scrollTop=0;document.body.style.overflow="hidden"}
+function closeOv(){$("ov").hidden=true;$("ov").innerHTML="";ovMode=null;document.body.style.overflow=""}
+function closePk(){$("pk").hidden=true;$("pk").innerHTML="";pkId=null}
+function openDetail(id,season){ovMode="detail";ovId=id;ovSeason=season?+season:null;renderDetail();showOv()}
+function availText(it){
+  const srcs=srcOf(it);if(!srcs)return null;
+  const names=[...new Set(srcs.map(s=>s.via?s.svc+" (in "+s.via+")":s.svc+(s.free?" (free)":"")))];
+  if(!names.length)return "Not streaming on any service Arena tracks right now (checked "+checkedOn()+").";
+  return "Streams on "+names.join(", ")+" in the US (checked "+checkedOn()+")."+(it.kind==="episode"?" Exact-episode links need Watchmode's paid plan, so Search opens the app's search for the show.":"");
+}
+function renderDetail(){
+  const it=BY[ovId];if(!it){closeOv();return}
+  const ser=it.kind==="series",epi=it.kind==="episode",t=ser?null:target(it),sh=epi?BY[it.series]:null;
+  const eps=ser?epsOf(it.id):[],seasons=[...new Set(eps.map(e=>e.s))];
+  if(ser&&(ovSeason==null||!seasons.includes(ovSeason)))ovSeason=seasons[0];
+  const meta=epi?`${esc(sh.title)} · Season ${it.s} · Episode ${it.e} · ${it.year} · ${fmtMin(it.min)}`:ser?`${eps.length} ${it.real?"":"sample "}episode${eps.length===1?"":"s"} across ${seasons.length} season${seasons.length===1?"":"s"}`:`${it.year} · ${fmtMin(it.min)}`;
+  const tags=themesOf(it).map(x=>`<span class="seb">${esc(x)}</span>`).join(" ");
+  const avail=availText(it)||(freeOf(it)?"Listed as a free title on YouTube or Tubi. Free availability changes, so the live version checks it before showing it.":(onOf(it)?`Sample tag: streams on ${onOf(it).join(", ")}.`:"No service is tagged in the sample data, so Arena uses the first app you picked in Settings."));
+  let h=`<div class="dbox"><div class="dban ${gOf(it)}"${it.img?` style="background:center 25%/cover url('${it.img}')"`:""}><button class="ib dclose" data-act="closeov" aria-label="Close">✕</button><span class="kick">${epi?"Episode · "+esc(sh.title):ser?"Series":"Film"}${it.img?"":" · placeholder art"}</span><h1>${esc(it.title)}</h1><div class="cm">${meta}</div><div class="pills">${tags}</div><div class="pills">`+
+    (t?`<a class="btn" href="${t.u}" target="_blank" rel="noopener">${openLbl(t)}</a>`:"")+
+    `<a class="btn alt" href="${trailerUrl(it)}" target="_blank" rel="noopener">Trailer</a><button class="btn alt" data-act="save" data-id="${it.id}">${inLib(it.id)?"♥ Saved":"♡ Save"}</button>`+
+    (ser?"":`<button class="btn alt" data-act="addpl" data-id="${it.id}">+ Playlist</button>`)+`</div></div><div class="dbody">`;
+  h+=`<p class="mute">${esc(avail)}</p>`+(it.real?(it.ov?`<p>${esc(it.ov)}</p>`:""):`<p class="mute">Synopsis, cast and real artwork come from the live catalog in the full build. Open launches the service's search page for now. Exact-episode launching is still to be tested on each service and device.</p>`);
+  if(epi)h+=`<button class="btn alt" data-act="detail" data-id="${sh.id}" data-season="${it.s}">All episodes of ${esc(sh.title)} ›</button>`;
+  if(ser){
+    h+=`<div class="sechead">Episodes</div><div class="chips">${seasons.map(n=>`<button class="chip${n===ovSeason?" on":""}" data-act="season" data-v="${n}">Season ${n}</button>`).join("")}</div><div class="list">`;
+    h+=eps.filter(e=>e.s===ovSeason).map(e=>{const te=target(e);return `<div class="pr"><span class="se">E${e.e}</span><div class="tx"><b>${esc(e.title)}</b><span class="cm">S${e.s} · E${e.e} · ${e.year} · ${fmtMin(e.min)} · ${esc(te.n)}</span></div><div class="pa"><a class="btn" href="${te.u}" target="_blank" rel="noopener">▶ Open</a><button class="pill${inLib(e.id)?" on":""}" data-act="save" data-id="${e.id}">${inLib(e.id)?"♥ Saved":"♡ Save"}</button><button class="pill" data-act="addpl" data-id="${e.id}">+ Playlist</button></div></div>`}).join("")+`</div>`;
+  }
+  $("ov").innerHTML=h+`</div></div>`;
+}
+function openPicker(id){
+  if(BY[id].kind==="series"){toast("Choose an exact episode to add");openDetail(id);return}
+  pkId=id;renderPicker();$("pk").hidden=false;
+}
+function renderPicker(){
+  const it=BY[pkId];
+  $("pk").innerHTML=`<div class="pkbox" role="dialog" aria-label="Add to playlist"><h3>Add to playlist</h3><p class="cm" style="margin:4px 0 10px">${esc(label(it))}</p><div class="list">`+
+    (ST.pl.length?ST.pl.map(p=>{const on=p.items.includes(pkId);return `<button class="pr" style="text-align:left;width:100%" data-act="tgpl" data-p="${p.id}"><span class="mini g-other">${on?"✓":"＋"}</span><span class="tx"><b>${esc(p.name)}</b><span class="cm">${p.items.length} title${p.items.length===1?"":"s"}${on?" · added":""}</span></span></button>`}).join(""):`<div class="cm">No playlists yet. Name your first one below.</div>`)+
+    `</div><div class="bar" style="margin-top:12px"><input class="in" id="pkn" placeholder="New playlist name" aria-label="New playlist name"><button class="btn" data-act="newpl">Create + add</button></div><button class="btn alt" data-act="closepk" style="width:100%;justify-content:center">Done</button></div>`;
+}
+function openSettings(){ovMode="settings";renderSettings();showOv()}
+function viaHtml(){
+  const opts=Object.keys(VIAOPT).filter(n=>ST.sv.includes(n));if(!opts.length)return"";
+  const via=ST.via||{};
+  return `<p class="mute" style="margin-top:12px"><b>How do you get it?</b> Add-ons play inside another app, so Arena opens that app instead.</p>`+opts.map(n=>`<label class="bar" style="align-items:center;gap:10px"><span style="min-width:90px">${esc(n)}</span><select class="in" data-via="${esc(n)}" aria-label="How you get ${esc(n)}"><option value="">Its own app</option>${VIAOPT[n].map(h=>`<option value="${esc(h)}"${via[n]===h?" selected":""}>Through ${esc(h)}</option>`).join("")}</select></label>`).join("");
+}
+document.addEventListener("change",ev=>{const n=ev.target.dataset&&ev.target.dataset.via;if(!n)return;ST.via=ST.via||{};if(ev.target.value)ST.via[n]=ev.target.value;else delete ST.via[n];save();render();toast(ev.target.value?n+" will open in "+ev.target.value:n+" will open in its own app")});
+function renderSettings(){
+  $("ov").innerHTML=`<div class="dbox"><button class="ib dclose" data-act="closeov" aria-label="Close">✕</button><div class="dbody" style="padding-top:calc(60px + env(safe-area-inset-top,0px))">`+
+    `<h1 class="sechead" style="margin-top:0">Profile and settings</h1>`+
+    `<div class="sechead">Account</div><p class="mute">Sign-in is a placeholder in this prototype. Nothing is saved to a server, and your playlists live in this browser only.</p><div class="bar"><button class="btn" data-act="auth">Sign in</button><button class="btn alt" data-act="auth">Create account</button></div>`+
+    `<div class="sechead">My services</div><p class="mute">Pick the services you pay for or use. Titles open the service they stream on, preferring yours. This only picks apps; it does not check or connect any streaming account.</p><div class="chips">${SV.map(s=>`<button class="chip${ST.sv.includes(s[0])?" on":""}" data-act="svc" data-v="${esc(s[0])}">${ST.sv.includes(s[0])?"✓ ":""}${esc(s[0])}</button>`).join("")}</div>`+viaHtml()+
+    `<div class="sechead">Display</div><div class="bar"><button class="btn alt" data-act="tv">${ST.tv?"TV layout preview: on":"TV layout preview: off"}</button></div><p class="mute">Shows the left navigation and larger type so you can judge how it reads from a couch. Arrow keys move focus between titles.</p>`+
+    `<div class="sechead">Prototype data</div><div class="bar"><button class="btn alt" data-act="reset">${resetArm?"Tap again to clear everything":"Clear my playlists, Library and services"}</button></div>`+
+    `<div class="sechead">About</div><p class="mute">Arena is a working name and the look is provisional. The catalog is a hand-picked starter list. Titles, episode details and artwork come from TMDB: this product uses the TMDB API but is not endorsed or certified by TMDB. Where-to-watch comes from Watchmode, checked ${checkedOn()}. Popular Playlists and Essentials are still sample picks.</p></div></div>`;
+}
+
+/* ---------- Events ---------- */
+function go(v){view=v;dview=null;suggest=null;shareTxt="";delArm=null;render();window.scrollTo(0,0)}
+document.addEventListener("click",ev=>{
+  const g=ev.target.closest("[data-go]");if(g){go(g.dataset.go);return}
+  if(ev.target===$("pk")){closePk();return}
+  if(ev.target===$("ov")){closeOv();return}
+  const b=ev.target.closest("[data-act]");if(!b)return;
+  const d=b.dataset,a=d.act,id=d.id;
+  const pl=dview&&dview.t==="pl"?plOf(dview.id):null;
+  switch(a){
+    case"go":go(d.v);break;
+    case"btheme":bTheme=d.v;bRT="";render();break;
+    case"skind":sKind=d.v;render();break;
+    case"sq":sQ=d.v;render();break;
+    case"lf":libF=d.v;render();break;
+    case"save":libToggle(id);break;
+    case"addpl":openPicker(id);break;
+    case"detail":openDetail(id,d.season);break;
+    case"season":ovSeason=+d.v;renderDetail();break;
+    case"closeov":closeOv();break;
+    case"closepk":closePk();break;
+    case"tgpl":{const p=plOf(d.p),k=p.items.indexOf(pkId);if(k>-1){p.items.splice(k,1);toast("Removed from "+p.name)}else{p.items.push(pkId);toast("Added to "+p.name)}save();renderPicker();if(view==="library"&&!dview&&$("ov").hidden)render();break}
+    case"newpl":{const p=plCreate($("pkn").value,pkId);if(!p){toast("Give the playlist a name first");break}toast("Added to "+p.name);renderPicker();break}
+    case"newpl0":{const p=plCreate($("npn").value);if(!p){toast("Give the playlist a name first");break}toast("Created "+p.name);dview={t:"pl",id:p.id};touchRecent(p.id);render();window.scrollTo(0,0);break}
+    case"openpl":dview={t:"pl",id};suggest=null;shareTxt="";delArm=null;touchRecent(id);render();window.scrollTo(0,0);break;
+    case"opencol":dview={t:"col",id};render();window.scrollTo(0,0);break;
+    case"back":dview=null;suggest=null;shareTxt="";delArm=null;render();window.scrollTo(0,0);break;
+    case"ren":{const n=$("rn").value.trim();if(pl&&n){pl.name=n;save();toast("Renamed");render()}break}
+    case"delpl":if(pl){if(delArm!==pl.id){delArm=pl.id;render();break}ST.pl=ST.pl.filter(x=>x.id!==pl.id);ST.recent=ST.recent.filter(r=>r.id!==pl.id);save();dview=null;delArm=null;toast("Playlist deleted. Its titles stay in your Library if you saved them.");render()}break;
+    case"mv":if(pl){const i=+d.i,j=i+ +d.d;if(j>=0&&j<pl.items.length){[pl.items[i],pl.items[j]]=[pl.items[j],pl.items[i]];save();render()}}break;
+    case"rm":if(pl){const it=BY[pl.items[+d.i]];pl.items.splice(+d.i,1);save();toast("Removed from "+pl.name+(it&&inLib(it.id)?". Still in your Library.":""));render()}break;
+    case"suggest":{const src=d.src;let ids=src==="pl"&&pl?pl.items.slice():ST.lib.map(x=>x.id);if(ids.length>1&&suggest)ids=ids.filter(x=>x!==suggest.id);if(!ids.length){toast("Add a few titles first");break}suggest={src,id:ids[Math.floor(Math.random()*ids.length)]};render();break}
+    case"copylist":if(pl){shareTxt=pl.name+"\n"+pl.items.map((r,i)=>{const it=BY[r];return (i+1)+". "+(it.kind==="episode"?BY[it.series].title+" "+se(it)+" · ":"")+it.title}).join("\n");
+      const done=ok=>{toast(ok?"List copied":"Select the text below to copy it");render()};
+      try{navigator.clipboard.writeText(shareTxt).then(()=>done(true),()=>done(false))}catch(e){done(false)}}break;
+    case"copycol":{const c=colOf(id),p=plCreate(c.name+(ST.pl.some(x=>x.name===c.name)?" copy":""));p.items=c.refs.slice();save();toast("Copied to your playlists");dview={t:"pl",id:p.id};touchRecent(p.id);render();window.scrollTo(0,0);break}
+    case"settings":openSettings();break;
+    case"auth":toast("Accounts arrive in the full build. Nothing is saved to a server yet.");break;
+    case"svc":{const k=ST.sv.indexOf(d.v);if(k>-1)ST.sv.splice(k,1);else ST.sv.push(d.v);save();renderSettings();render();break}
+    case"tv":ST.tv=!ST.tv;save();layout();renderSettings();break;
+    case"reset":if(!resetArm){resetArm=true;renderSettings();break}resetAll();break;
+    case"addcustom":addCustom();break;
+  }
+});
+document.addEventListener("input",ev=>{if(ev.target.id==="q"){sQ=ev.target.value;$("sres").innerHTML=sres()}});
+document.addEventListener("change",ev=>{
+  const i=ev.target.id;
+  if(i==="srt"){sRT=ev.target.value;$("sres").innerHTML=sres()}
+  else if(i==="sdc"){sDC=ev.target.value;$("sres").innerHTML=sres()}
+  else if(i==="sso"){sSort=ev.target.value;$("sres").innerHTML=sres()}
+  else if(i==="brt"){bRT=ev.target.value;render()}
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&e.target.id==="npn"){document.querySelector('[data-act="newpl0"]').click();return}
+  if(e.key==="Enter"&&e.target.id==="pkn"){document.querySelector('[data-act="newpl"]').click();return}
+  if(e.key==="Escape"){if(!$("pk").hidden)closePk();else if(!$("ov").hidden)closeOv();return}
+  const D={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!D)return;
+  const a=document.activeElement;if(!a||/^(INPUT|SELECT|TEXTAREA|BODY)$/.test(a.tagName))return;
+  const scope=!$("pk").hidden?$("pk"):!$("ov").hidden?$("ov"):document;
+  const els=[...scope.querySelectorAll("a[href],button:not([disabled])")].filter(x=>x.getClientRects().length);
+  if(!els.includes(a))return;
+  const r=a.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let best=null,bs=1e9;
+  els.forEach(x=>{if(x===a)return;const q=x.getBoundingClientRect(),dx=q.left+q.width/2-cx,dy=q.top+q.height/2-cy;
+    if(D[0]&&dx*D[0]<=4)return;if(D[1]&&dy*D[1]<=4)return;
+    const s=(D[0]?Math.abs(dx):Math.abs(dy))+(D[0]?Math.abs(dy):Math.abs(dx))*2.5;if(s<bs){bs=s;best=x}});
+  if(best){best.focus();e.preventDefault()}
+});
+
+/* ---------- Your own titles, reset, layout, start ---------- */
+function addCustom(){
+  const k=$("ak").value,t=$("at").value.trim(),y=+$("ay").value,m=+$("am").value,th=$("ath").value;
+  if(!t||!y||!m){toast("Add a title, year and minutes");return}
+  let o;
+  if(k==="movie"){o={id:"u"+ST.cid++,kind:"movie",title:t,year:y,min:m,themes:[th],on:null,custom:true};MV.push(reg(o))}
+  else{
+    const sn=$("as").value.trim(),s=+$("asn").value,e=+$("aen").value;
+    if(!sn||!s||!e){toast("Episodes need a show, season and episode number");return}
+    let sh=SR.find(x=>x.title.toLowerCase()===sn.toLowerCase());
+    if(!sh){sh={id:"u"+ST.cid++,kind:"series",title:sn,on:null,themes:[],custom:true};SR.push(reg(sh));ST.custom.push(sh)}
+    o={id:"u"+ST.cid++,kind:"episode",series:sh.id,s,e,title:t,year:y,min:m,themes:[th],custom:true};EP.push(reg(o));
+  }
+  ST.custom.push(o);ST.lib.push({id:o.id,t:Date.now()});save();toast("Added to the catalog and your Library");render();
+}
+function resetAll(){
+  ST.custom.forEach(o=>{delete BY[o.id];const arr=o.kind==="movie"?MV:o.kind==="series"?SR:EP,i=arr.indexOf(o);if(i>-1)arr.splice(i,1)});
+  Object.assign(ST,{pl:[],lib:[],recent:[],sv:[],custom:[],pid:1,cid:1,tv:false});
+  resetArm=false;save();layout();dview=null;view="home";closeOv();render();toast("Prototype data cleared");
+}
+function layout(){document.body.classList.toggle("side",innerWidth>=768||!!ST.tv);document.documentElement.classList.toggle("tv",!!ST.tv)}
+addEventListener("resize",layout);
+load();layout();render();
+</script>
