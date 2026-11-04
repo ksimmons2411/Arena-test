@@ -139,6 +139,23 @@ h2.sec small{font:500 14px var(--body);color:var(--mute)}
 #toast[hidden]{display:none}
 .empty{padding:28px;border-radius:22px;border:1px dashed rgba(255,178,56,.35);color:var(--soft);text-align:center}
 .credit{margin-top:40px;font-size:12px;color:#7E6F70;max-width:720px}
+/* TV: remote control, viewed from across the room */
+html.tv body{font-size:18px}
+html.tv #app{padding:28px 56px 80px 128px}
+html.tv :focus{outline:none}
+html.tv a:focus,html.tv button:focus{box-shadow:0 0 0 3px #F6EDE3,0 0 0 9px rgba(255,178,56,.35),0 18px 44px rgba(255,150,60,.3)!important;border-radius:18px;position:relative;z-index:3}
+html.tv .poster a.pa:focus{box-shadow:none!important}
+html.tv .poster a.pa:focus .img{box-shadow:0 0 0 3px #F6EDE3,0 0 0 9px rgba(255,178,56,.35),0 22px 50px rgba(255,150,60,.35);transform:scale(1.05)}
+html.tv .poster .img{transition:transform 200ms ease,box-shadow 200ms ease}
+html.tv .stop:focus .art{box-shadow:0 0 0 3px #F6EDE3,0 0 0 9px rgba(255,178,56,.35)!important;transform:scale(1.05)}
+html.tv .stop:focus{box-shadow:none!important}
+html.tv .pl:focus{box-shadow:none!important}
+html.tv .pl:focus .cover{box-shadow:0 0 0 3px #F6EDE3,0 0 0 9px rgba(255,178,56,.35),0 22px 50px rgba(255,150,60,.35);transform:scale(1.05)}
+html.tv .cover{transition:transform 200ms ease,box-shadow 200ms ease}
+html.tv [data-addlink],html.tv .linkform,html.tv [data-pastefor],html.tv [data-edit],html.tv [data-rename],html.tv [data-delpl],html.tv [data-sharelinks],html.tv .lrow .mute+.mute{display:none!important}
+html.tv .sq{pointer-events:none}
+html.tv h2.sec small{display:none}
+html.tv .lcard{cursor:default}
 /* phone */
 @media (max-width:760px){
   #app{padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px))}
@@ -162,6 +179,7 @@ h2.sec small{font:500 14px var(--body);color:var(--mute)}
 <main id="app"></main>
 <div id="sheet" hidden><div class="box" id="sheetbox"></div></div>
 <div id="toast" role="status" hidden></div>
+<script>if (/veneTV/.test(navigator.userAgent) || /[?&]tv=1/.test(location.search)) document.documentElement.classList.add("tv");</script>
 <script src="vene-data.js"></script>
 <script>
 "use strict";
@@ -288,11 +306,13 @@ function placeSquares() {
   });
 }
 function heroText(four, th) {
+  const box = $("herotext"), act = document.activeElement, keep = box && box.contains(act) ? [...box.querySelectorAll("a,button")].indexOf(act) : -1;
   const it = four[heroK], t = target(it), s = showOf(it);
   const meta = it.kind === "episode" ? s.title + " · " + se(it) + " · " + fmtMin(it.min) : [it.year, fmtMin(it.min)].filter(Boolean).join(" · ");
   $("herotext").innerHTML = `<span class="kick">This week's four · ${esc(th)}</span><h1>${esc(it.kind === "episode" ? it.title : it.title)}</h1>
     <div style="display:flex;align-items:center;gap:10px;justify-content:inherit"><span style="width:11px;height:11px;border-radius:999px;background:${svcColor(t)}"></span><span style="color:var(--soft)">${esc(meta)} · ${esc(t.n)}</span></div>
     <div class="acts" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap"><a class="btnp" href="${esc(t.u)}"${t.copy ? ` data-copy="${esc(t.copy)}"` : ""}><i>${svgPlay(14, "#FFB238")}</i>${esc(playLabel(t))}</a><button class="btng warm" data-add="${it.id}">${svgPlus(18)}Add to playlist</button><button class="btng warm" data-go="t:${it.id}">Details</button></div>`;
+  if (keep > -1) { const el = box.querySelectorAll("a,button")[keep]; if (el) el.focus({ preventScroll: true }); }
   document.querySelectorAll(".pip").forEach((p, j) => p.classList.toggle("on", j === heroK));
   const g = it.kind === "episode" ? "230,160,90" : ["255,150,60", "79,193,176", "230,160,90", "62,143,168"][heroK];
   document.body.style.setProperty("--bg", `radial-gradient(55% 45% at 72% 14%, rgba(${g},.28) 0%, rgba(${g},.07) 45%, rgba(18,14,20,0) 75%), radial-gradient(50% 40% at 0% 100%, rgba(79,193,176,.10) 0%, rgba(18,14,20,0) 70%), linear-gradient(180deg,#1A1218 0%,#120E14 55%,#0C090D 100%)`);
@@ -349,6 +369,7 @@ function home() {
   h += `<p class="credit">Starter catalog of hand-picked titles. Search of the full catalog and "Fresh this week" arrive with vene's online service. Titles, episode details and artwork: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Where to watch: <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>, checked ${esc(checkedOn())}.</p>`;
   $("app").innerHTML = h;
   heroText(four, th); placeSquares(); heroLoop(four, th);
+  if (document.documentElement.classList.contains("tv")) { document.querySelectorAll(".sq").forEach(x => x.tabIndex = -1); const f = document.querySelector("#herotext .btnp"); if (f && !document.activeElement.closest?.("#app")) f.focus(); }
   window.__four = { four, th };
 }
 
@@ -539,16 +560,18 @@ document.addEventListener("contextmenu", e => { if (e.target.closest(".lrow[data
 function rail(v) {
   $("rail").innerHTML = NAV.map(([k, label, path]) => `<a class="navb${(v === k || (k === "playlists" && v === "pl") || (k === "browse" && v === "t")) ? " on" : ""}" href="#${k}" aria-label="${label}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${path}</svg><span>${label}</span></a>`).join("");
 }
+function tvFocus() { if (!document.documentElement.classList.contains("tv")) return; if (route().v === "home") return; const f = document.querySelector("#app .btnp, #app .lcard, #app a.pa, #app .chip"); if (f) f.focus(); }
 function render() {
   const { v, arg } = route();
   if (v !== "home") { clearTimeout(heroA); clearTimeout(heroB); }
   rail(v);
   if (v === "t") titlePage(arg); else if (v === "pl") playlistPage(arg); else if (v === "playlists") playlistsPage(); else if (v === "browse") browsePage(); else if (v === "library") libraryPage(); else if (v === "search") searchPage(arg); else if (v === "services") servicesPage(); else if (v === "link") linkPage(arg); else home();
 }
-window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); tvFocus(); });
 window.addEventListener("resize", () => { if (route().v === "home") placeSquares(); });
 let qT;
 document.addEventListener("input", e => { if (e.target.id === "q") { clearTimeout(qT); const v = e.target.value; qT = setTimeout(() => { history.replaceState(null, "", "#search:" + encodeURIComponent(v)); render(); }, 250); } });
+document.addEventListener("focusin", e => { if (document.documentElement.classList.contains("tv") && e.target.scrollIntoView) e.target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); });
 document.addEventListener("submit", e => {
   if (e.target.classList.contains("pickform")) { e.preventDefault(); const u = extractUrl(e.target.elements.u.value); if (u && hostSvc(u)) go("link:" + encodeURIComponent(u)); else toast("That doesn't look like a streaming app's link"); return; }
   if (e.target.classList.contains("linkform")) { e.preventDefault(); const u = extractUrl(e.target.elements.u.value); if (!u || !hostSvc(u)) { toast("That doesn't look like a streaming app's Share link"); return; } ST.links[e.target.dataset.id] = u; save(); toast("Saved. Play opens this exact episode"); return render(); }
@@ -575,7 +598,7 @@ document.addEventListener("click", e => {
   if (d.playpl) { const [pid, j] = d.playpl.split("|"); return play(BY[plOf(pid).items[+j]], pid); }
   if (d.keep) { const p = plOf(d.keep); const done = ST.played[p.id] == null ? -1 : ST.played[p.id]; const j = Math.min(done + 1, p.items.length - 1); return play(BY[p.items[j]], p.id); }
   if (d.pickfor) { const p = plOf(d.pickfor); const it = BY[p.items[Math.floor(Math.random() * p.items.length)]]; toast("How about " + it.title + "?"); threadSel[p.id] = p.items.indexOf(it.id); return render(); }
-  if (d.stop) { const [pid, j] = d.stop.split("|"); if (threadSel[pid] === +j) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
+  if (d.stop) { const [pid, j] = d.stop.split("|"); if (threadSel[pid] === +j || document.documentElement.classList.contains("tv")) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
   if (d.sel) { const [pid, j] = d.sel.split("|"); if (threadSel[pid] === +j) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
   if (d.mv) { const [pid, j, dir] = d.mv.split("|"); const p = plOf(pid), i = +j, k = i + +dir; if (k < 0 || k >= p.items.length) return; [p.items[i], p.items[k]] = [p.items[k], p.items[i]]; threadSel[pid] = k; save(); return render(); }
   if (d.rm) { const [pid, j] = d.rm.split("|"); const p = plOf(pid); const t = BY[p.items[+j]]; p.items.splice(+j, 1); if (ST.played[pid] >= +j) ST.played[pid]--; delete threadSel[pid]; save(); toast("Removed " + t.title); return render(); }
