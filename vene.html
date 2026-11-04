@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="vene">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#120E14">
+<title>vene</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@800&family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+/* vene · design G: warm room, square covers, quiet dots on the thread. */
+:root{
+  --ink:#F6EDE3;--mute:#9C8C8A;--soft:#CDBDB8;--amber:#FFB238;--amber-hi:#FFCB7A;--ground:#120E14;--deep:#0C090D;
+  --glass:rgba(255,236,220,.055);--line:rgba(255,226,200,.10);
+  --disp:"Bricolage Grotesque",system-ui,sans-serif;--body:"Hanken Grotesk",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.45 var(--body);-webkit-font-smoothing:antialiased}
+body{min-height:100vh;background:var(--bg,linear-gradient(180deg,#1A1218 0%,#120E14 55%,#0C090D 100%)) fixed;transition:background 900ms ease}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background-image:radial-gradient(circle,rgba(255,240,225,.06) .8px,transparent 1.2px);background-size:4px 4px;z-index:0}
+button{font:inherit;color:inherit}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:14px}
+.disp{font-family:var(--disp);font-optical-sizing:auto}
+.warm{background:var(--glass);border:1px solid var(--line);-webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%)}
+.mute{color:var(--mute)}
+#app{position:relative;z-index:1;padding:calc(env(safe-area-inset-top,0px) + 22px) max(40px,env(safe-area-inset-right,0px)) 120px calc(max(16px,env(safe-area-inset-left,0px)) + 88px)}
+/* rail (tablet, TV) and tab bar (phone) */
+#rail{position:fixed;left:max(14px,env(safe-area-inset-left,0px));top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:24px;z-index:20;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.navb{width:48px;height:48px;border-radius:15px;border:0;background:transparent;color:var(--mute);display:grid;place-items:center;cursor:pointer;text-decoration:none}
+.navb.on{background:rgba(255,178,56,.16);color:var(--amber-hi)}
+.navb span{display:none}
+header.top{display:flex;align-items:center;gap:18px;margin-bottom:22px}
+.search{display:flex;align-items:center;gap:10px;border-radius:999px;padding:11px 18px;flex:1;max-width:460px;color:var(--mute)}
+.search input{border:0;background:transparent;color:var(--ink);font:500 15px var(--body);outline:none;width:100%}
+.me{display:flex;align-items:center;gap:12px;border:0;background:transparent;cursor:pointer;margin-left:auto;padding:4px;border-radius:999px}
+.avatar{width:40px;height:40px;border-radius:999px;background:linear-gradient(135deg,#FFB238,#4FC1B0);box-shadow:0 0 0 3px var(--ground),0 0 0 5px rgba(255,178,56,.55);flex:none}
+/* buttons */
+.btnp{border:0;border-radius:999px;height:50px;padding:0 24px 0 8px;font:700 16px var(--body);background:var(--amber);color:#24160A;display:inline-flex;align-items:center;gap:12px;cursor:pointer;box-shadow:0 12px 34px rgba(255,178,56,.3);text-decoration:none;white-space:nowrap}
+.btnp i{width:34px;height:34px;border-radius:999px;background:#24160A;display:grid;place-items:center}
+.btng{border-radius:999px;height:50px;padding:0 18px;font:700 15px var(--body);color:var(--ink);display:inline-flex;align-items:center;gap:9px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.chip{border-radius:999px;padding:9px 15px;font:700 13px var(--body);color:#E2D4CC;cursor:pointer;background:rgba(255,236,220,.05);border:1px solid rgba(255,226,200,.14);display:inline-flex;align-items:center;gap:8px}
+.chip.on{background:rgba(255,178,56,.16);border-color:rgba(255,178,56,.6);color:var(--amber-hi)}
+.row{display:flex;gap:16px;overflow-x:auto;scrollbar-width:none;padding:6px 4px 14px;margin:0 -4px;scroll-snap-type:x proximity}
+.row::-webkit-scrollbar{display:none}
+.row>*{scroll-snap-align:start}
+h2.sec{margin:28px 0 12px;font:700 24px var(--disp);letter-spacing:-.02em;display:flex;align-items:baseline;gap:12px}
+h2.sec small{font:500 14px var(--body);color:var(--mute)}
+/* hero */
+.hero{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:20px;align-items:center;min-height:310px}
+.hero .kick{font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+.hero h1{margin:12px 0;font:800 clamp(40px,5.4vw,64px)/.92 var(--disp);letter-spacing:-.035em;text-wrap:balance}
+.stage{position:relative;height:310px}
+.sq{position:absolute;border-radius:16px;background:#2A1C24 center/cover no-repeat;transition:left 650ms cubic-bezier(.2,.8,.2,1),top 650ms cubic-bezier(.2,.8,.2,1),width 650ms cubic-bezier(.2,.8,.2,1),height 650ms cubic-bezier(.2,.8,.2,1),transform 650ms cubic-bezier(.2,.8,.2,1),opacity 650ms ease,box-shadow 650ms ease;border:0;padding:0;cursor:pointer}
+.pips{display:flex;gap:7px;margin-top:16px}
+.pip{width:7px;height:7px;border-radius:999px;border:0;padding:0;background:rgba(246,237,227,.25);cursor:pointer;transition:width 300ms ease}
+.pip.on{width:26px;background:var(--amber)}
+/* thread */
+.thread{position:relative;display:flex;gap:22px;overflow-x:auto;scrollbar-width:none;padding:6px 4px 10px}
+.thread::-webkit-scrollbar{display:none}
+.thread .ln{position:absolute;left:34px;height:2px;top:122px;pointer-events:none}
+.stop{width:176px;flex:none;display:flex;flex-direction:column;gap:9px;border:0;background:transparent;padding:0;text-align:left;cursor:pointer}
+.stop .art{display:block;width:176px;height:99px;border-radius:16px;background:#2A1C24 center/cover;transition:transform 250ms ease,box-shadow 250ms ease}
+.nodewrap{width:30px;height:30px;margin-left:16px;display:grid;place-items:center;position:relative;z-index:1}
+.node{border-radius:999px;display:grid;place-items:center;font:800 10px var(--body);border:3px solid #150F14;transition:all 250ms ease}
+.tag{font:700 10px var(--body);letter-spacing:.12em;text-transform:uppercase}
+/* covers */
+.cover{display:grid;grid-template-columns:1fr 1fr;gap:3px;border-radius:18px;overflow:hidden;aspect-ratio:1;box-shadow:0 18px 36px rgba(0,0,0,.45);background:#2A1C24}
+.cover span{background:#3A2A30 center/cover}
+.pl{width:180px;flex:none;border:0;background:transparent;padding:0;text-align:left;display:flex;flex-direction:column;gap:10px;cursor:pointer;text-decoration:none}
+.dots{display:flex;align-items:center;gap:5px}
+.dots i{width:9px;height:9px;border-radius:999px;display:block}
+.poster{width:150px;flex:none;border:0;background:transparent;padding:0;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:8px;text-decoration:none}
+.poster .img{display:block;width:150px;aspect-ratio:2/3;border-radius:14px;background:#2A1C24 center/cover;box-shadow:0 14px 30px rgba(0,0,0,.4);position:relative}
+.poster .img.ep{aspect-ratio:16/9;width:230px}
+.poster.ep{width:230px}
+.poster b{font-size:14px;line-height:1.25}
+.svcdot{position:absolute;right:10px;bottom:-6px;width:14px;height:14px;border-radius:999px;border:3px solid #150F14}
+/* lists */
+.lineup{position:relative;list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.lineup .vl{position:absolute;left:16px;top:36px;bottom:36px;width:2px}
+.lrow{display:flex;align-items:center;gap:14px;position:relative}
+.lrow .nodewrap{margin:0;width:34px;height:34px;flex:none}
+.lcard{flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:20px;border:1px solid rgba(255,226,200,.07);background:rgba(255,236,220,.04);cursor:pointer;text-align:left}
+.lcard.on{background:linear-gradient(90deg,rgba(255,178,56,.16),rgba(255,178,56,.03));border-color:rgba(255,178,56,.35)}
+.lcard .th{width:100px;height:56px;flex:none;border-radius:12px;background:#2A1C24 center/cover}
+.ib{width:40px;height:40px;border-radius:999px;border:1px solid var(--line);background:var(--glass);display:grid;place-items:center;cursor:pointer;color:var(--ink);flex:none}
+.ib.play{background:rgba(255,178,56,.14);border-color:rgba(255,178,56,.45)}
+/* panels */
+.panel{border-radius:24px;padding:18px}
+.h3{margin:0 0 10px;font:700 12px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:22px 18px}
+.grid .poster,.grid .poster .img{width:100%}
+.toggle{width:48px;height:28px;border-radius:999px;border:0;padding:3px;background:rgba(255,226,200,.16);cursor:pointer;display:flex;flex:none}
+.toggle.on{background:var(--amber);justify-content:flex-end}
+.toggle i{width:22px;height:22px;border-radius:999px;background:var(--ink)}
+.seg{border:0;border-radius:999px;padding:6px 11px;font:700 12px var(--body);color:#B9A9A6;background:transparent;cursor:pointer;white-space:nowrap}
+.seg.on{background:rgba(255,178,56,.16);color:var(--amber-hi)}
+/* sheet + toast */
+#sheet{position:fixed;inset:0;z-index:50;background:rgba(5,3,6,.6);display:flex;align-items:flex-end;justify-content:center}
+#sheet[hidden]{display:none}
+#sheet .box{width:min(560px,100%);max-height:85vh;overflow:auto;border-radius:28px 28px 0 0;background:linear-gradient(180deg,#24181F,#140E13);border:1px solid var(--line);padding:14px 20px calc(24px + env(safe-area-inset-bottom,0px))}
+#toast{position:fixed;left:50%;bottom:calc(30px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#F6EDE3;color:#1A1216;font-weight:700;padding:12px 20px;border-radius:999px;z-index:60;box-shadow:0 12px 30px rgba(0,0,0,.4)}
+#toast[hidden]{display:none}
+.empty{padding:28px;border-radius:22px;border:1px dashed rgba(255,178,56,.35);color:var(--soft);text-align:center}
+.credit{margin-top:40px;font-size:12px;color:#7E6F70;max-width:720px}
+/* phone */
+@media (max-width:760px){
+  #app{padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px))}
+  #rail{top:auto;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:14px;right:14px;transform:none;flex-direction:row;justify-content:space-around;border-radius:999px;padding:6px 10px}
+  .navb{width:auto;flex:1;height:auto;flex-direction:column;gap:2px;padding:6px 0;font:600 10px var(--body);border-radius:16px;display:flex;align-items:center}
+  .navb span{display:block}
+  .navb.on{background:transparent}
+  header.top{gap:10px}
+  .search{max-width:none;padding:10px 14px}
+  .me b{display:none}
+  .hero{grid-template-columns:1fr;text-align:center;justify-items:center}
+  .hero .stage{order:-1;width:290px;height:230px}
+  .hero .acts{justify-content:center}
+  .pips{justify-content:center}
+  .titlehead{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<nav id="rail" class="warm" aria-label="Main"></nav>
+<main id="app"></main>
+<div id="sheet" hidden><div class="box" id="sheetbox"></div></div>
+<div id="toast" role="status" hidden></div>
+<script src="vene-data.js"></script>
+<script>
+"use strict";
+/* ---------- data ---------- */
+const D = window.VENE_DATA || { items: [], playlists: [], checked: "" };
+const BY = {}; D.items.forEach(it => BY[it.id] = it);
+const EPS = id => D.items.filter(x => x.kind === "episode" && x.series === id).sort((a, b) => a.s - b.s || a.e - b.e);
+
+const SVC = {
+  "Netflix": { t: "N", c: "#E50914", f: "#fff", q: "https://www.netflix.com/search?q=" },
+  "Hulu": { t: "h", c: "#1CE783", f: "#0B2A1A", q: "https://www.hulu.com/search?q=" },
+  "Disney+": { t: "D+", c: "#2E6BFF", f: "#fff", q: "https://www.disneyplus.com/search?q=" },
+  "Prime Video": { t: "pv", c: "#00A8E1", f: "#04222E", q: "https://www.primevideo.com/search?phrase=" },
+  "Peacock": { t: "P", c: "#F6EDE3", f: "#1A1216", q: "https://www.peacocktv.com/watch/search?q=" },
+  "HBO Max": { t: "M", c: "#7B5CFF", f: "#fff", q: "https://play.hbomax.com/search?q=" },
+  "Paramount+": { t: "P+", c: "#1F6FFF", f: "#fff", q: "https://www.paramountplus.com/search/?q=" },
+  "Apple TV+": { t: "tv", c: "#CFC6C0", f: "#1A1216", q: "https://tv.apple.com/search?term=" },
+  "YouTube": { t: "YT", c: "#FF3B30", f: "#fff", q: "https://www.youtube.com/results?search_query=" },
+  "Tubi": { t: "Tu", c: "#FFB000", f: "#1A1216", q: "https://tubitv.com/search/" },
+  "Pluto TV": { t: "Pl", c: "#FFE14D", f: "#1A1216", q: null },
+  "Plex": { t: "Px", c: "#E5A00D", f: "#1A1216", q: null }
+};
+const SUBS = ["Netflix", "Hulu", "Disney+", "Prime Video", "Peacock", "HBO Max", "Paramount+", "Apple TV+"];
+const FREE = ["YouTube", "Tubi", "Pluto TV", "Plex"];
+const VIAOPT = { "HBO Max": ["Hulu", "Prime Video"], "Peacock": ["Prime Video"], "Hulu": ["Disney+"], "Paramount+": ["Prime Video"] };
+const STORES = { "Apple TV": "https://tv.apple.com/search?term=", "Prime Video": "https://www.primevideo.com/search?phrase=", "Fandango at Home": "https://athome.fandango.com/content/browse/search?searchString=", "Google TV": "https://play.google.com/store/search?c=movies&q=" };
+const THEMES = ["Halloween", "Thanksgiving", "Christmas", "Romance", "Family", "Thriller"];
+
+/* ---------- saved state (this device) ---------- */
+const KEY = "vene.v1";
+const ST = { sv: ["Netflix", "Hulu", "Disney+", "Prime Video", "YouTube", "Tubi", "Pluto TV"], via: {}, own: {}, lib: [], pls: null, played: {}, recent: null, pid: 1 };
+try { Object.assign(ST, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+if (!Array.isArray(ST.pls)) ST.pls = D.playlists.map(p => ({ id: p.id, name: p.name, items: p.items.slice() }));
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) {} };
+const plOf = id => ST.pls.find(p => p.id === id);
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const showOf = it => it.kind === "episode" ? BY[it.series] : it;
+const fmtMin = m => !m ? "" : m < 60 ? m + "m" : Math.floor(m / 60) + "h" + (m % 60 ? " " + (m % 60) + "m" : "");
+const se = it => "S" + it.s + " E" + it.e;
+const nameOf = it => it.kind === "episode" ? showOf(it).title + " · " + it.title : it.title;
+const art = (it, wide) => { const s = showOf(it); return (wide ? (it.bg || it.img || s.bg || s.img) : (it.img || s.img)) || ""; };
+const bgUrl = u => u ? `background-image:url('${esc(u)}')` : "";
+const checkedOn = () => D.checked ? new Date(D.checked + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+const svgPlay = (s, c) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" fill="${c}"/></svg>`;
+const svgPlus = s => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+const svgHeart = (s, on) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="${on ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>`;
+const svgDie = s => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4.5"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>`;
+const LOGO = h => `<svg width="${(h * 96 / 36).toFixed(1)}" height="${h}" viewBox="0 0 96 36" role="img" aria-label="vene" style="overflow:visible;flex:none"><path d="M4.25 18.25L11 28.75L17.75 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="4.25" cy="12.85" r="1.8" fill="#FFB238"/><circle cx="17.75" cy="12.85" r="1.8" fill="#FFB238"/><text x="21.5" y="31" font-family="Nunito, system-ui, sans-serif" font-weight="800" font-size="31" letter-spacing="-0.6" fill="#F6EDE3">ene.</text></svg>`;
+let tt; const toast = m => { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); };
+
+/* ---------- where it plays ---------- */
+const srcOf = it => showOf(it).src || [];
+function pick(srcs) {
+  const yours = s => !s.free && ST.sv.includes(s.svc) && (ST.via[s.svc] || null) === (s.via || null);
+  return srcs.find(yours) || srcs.find(s => s.free && ST.sv.includes(s.svc)) || srcs.find(s => s.free) || null;
+}
+function target(it) {
+  const base = showOf(it), store = ST.own[base.id], q = encodeURIComponent(base.title);
+  if (store) { const u = (base.buy || {})[store]; return { n: store, u: u || STORES[store] + q, mine: true, owned: true, search: !u }; }
+  const srcs = srcOf(it);
+  if (!srcs.length) {
+    const stores = Object.keys(base.buy || {});
+    if (stores.length) return { n: stores[0], u: base.buy[stores[0]], mine: false, rent: true };
+    return { n: "JustWatch", u: "https://www.justwatch.com/us/search?q=" + q, mine: false };
+  }
+  const p = pick(srcs);
+  if (!p) { const h = srcs.find(x => ST.sv.includes(x.svc) && ST.via[x.svc] && SVC[ST.via[x.svc]]); if (h) { const app = ST.via[h.svc]; return { n: app, u: SVC[app].q + q, mine: true, search: true, check: true, svc: h.svc }; } }
+  const s = p || srcs[0], app = s.via || s.svc;
+  if (it.kind === "episode") return { n: app, u: SVC[app] && SVC[app].q ? SVC[app].q + q : s.u, mine: !!p, search: true, svc: s.svc };
+  return { n: s.via ? s.svc + " in " + s.via : s.svc, u: s.u, mine: !!p, svc: s.svc };
+}
+const playLabel = t => t.owned ? "Play from " + t.n : t.check ? "Check " + t.n : t.rent ? "Rent or buy on " + t.n : t.search ? "Find in " + t.n : "Play on " + t.n;
+const svcColor = t => (SVC[t.svc] || SVC[t.n] || { c: "#9C8C8A" }).c;
+function play(it, plId) {
+  const t = target(it);
+  if (plId) { const p = plOf(plId); const i = p ? p.items.indexOf(it.id) : -1; if (i > -1) { ST.played[plId] = i; ST.recent = plId; save(); } }
+  location.href = t.u;
+}
+
+/* ---------- navigation ---------- */
+const NAV = [["home", "Home", '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'], ["browse", "Browse", '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>'], ["library", "Library", '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'], ["playlists", "Playlists", '<circle cx="5" cy="12" r="2.4"/><circle cx="19" cy="12" r="2.4"/><path d="M7.4 12h9.2"/>']];
+function route() { const h = decodeURIComponent(location.hash.slice(1)) || "home"; const [v, ...r] = h.split(":"); return { v, arg: r.join(":") }; }
+const go = h => { location.hash = h; };
+function header() {
+  return `<header class="top">${LOGO(34)}<label class="search warm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search movies, shows, episodes" aria-label="Search" value="${esc(route().v === "search" ? route().arg : "")}"></label><button class="me" data-go="services" aria-label="Profile and My Services"><b>Krystal</b><span class="avatar"></span></button></header>`;
+}
+
+/* ---------- home ---------- */
+let heroK = 0, heroFocus = true, heroA, heroB, heroAuto = true;
+function seasonTheme() { const m = new Date().getMonth(); return m === 9 ? "Halloween" : m === 10 ? "Thanksgiving" : m === 11 ? "Christmas" : m === 1 ? "Romance" : "Family"; }
+function heroFour() {
+  const th = seasonTheme();
+  const pool = D.items.filter(x => x.kind !== "series" && (x.themes || []).includes(th) && art(x, true));
+  const four = []; const seen = new Set();
+  for (const x of pool) { const k = showOf(x).id; if (!seen.has(k)) { seen.add(k); four.push(x); } if (four.length === 4) break; }
+  for (const x of D.items) { if (four.length === 4) break; if (x.kind === "movie" && x.bg && !four.includes(x)) four.push(x); }
+  return { th, four };
+}
+const GRID = [[85, 20, 130, 130, 0, 1, 1], [225, 20, 130, 130, 0, 1, 1], [85, 160, 130, 130, 0, 1, 1], [225, 160, 130, 130, 0, 1, 1]];
+const BACK = [[18, 78, 120, 120, -10, 1, .55], [302, 78, 120, 120, 10, 1, .55], [160, 0, 120, 120, 3, 1, .4]];
+function placeSquares() {
+  const phone = innerWidth <= 760, f = phone ? 290 / 440 : 1;
+  let b = 0;
+  document.querySelectorAll(".sq").forEach((el, j) => {
+    const v = !heroFocus ? GRID[j] : j === heroK ? [105, 42, 230, 230, 0, 5, 1] : BACK[b++];
+    const [x, y, w, h, r, z, o] = v, hi = heroFocus && j === heroK;
+    el.style.cssText += `;left:${x * f}px;top:${y * f}px;width:${w * f}px;height:${h * f}px;transform:rotate(${r}deg);z-index:${z};opacity:${o};box-shadow:${hi ? "0 0 0 3px #FFB238,0 36px 70px rgba(0,0,0,.6),0 0 60px rgba(255,178,56,.25)" : "0 18px 36px rgba(0,0,0,.5)"}`;
+  });
+}
+function heroText(four, th) {
+  const it = four[heroK], t = target(it), s = showOf(it);
+  const meta = it.kind === "episode" ? s.title + " · " + se(it) + " · " + fmtMin(it.min) : [it.year, fmtMin(it.min)].filter(Boolean).join(" · ");
+  $("herotext").innerHTML = `<span class="kick">This week's four · ${esc(th)}</span><h1>${esc(it.kind === "episode" ? it.title : it.title)}</h1>
+    <div style="display:flex;align-items:center;gap:10px;justify-content:inherit"><span style="width:11px;height:11px;border-radius:999px;background:${svcColor(t)}"></span><span style="color:var(--soft)">${esc(meta)} · ${esc(t.n)}</span></div>
+    <div class="acts" style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap"><button class="btnp" data-play="${it.id}"><i>${svgPlay(14, "#FFB238")}</i>${esc(playLabel(t))}</button><button class="btng warm" data-add="${it.id}">${svgPlus(18)}Add to playlist</button><button class="btng warm" data-go="t:${it.id}">Details</button></div>`;
+  document.querySelectorAll(".pip").forEach((p, j) => p.classList.toggle("on", j === heroK));
+  const g = it.kind === "episode" ? "230,160,90" : ["255,150,60", "79,193,176", "230,160,90", "62,143,168"][heroK];
+  document.body.style.setProperty("--bg", `radial-gradient(55% 45% at 72% 14%, rgba(${g},.28) 0%, rgba(${g},.07) 45%, rgba(18,14,20,0) 75%), radial-gradient(50% 40% at 0% 100%, rgba(79,193,176,.10) 0%, rgba(18,14,20,0) 70%), linear-gradient(180deg,#1A1218 0%,#120E14 55%,#0C090D 100%)`);
+}
+function heroLoop(four, th) {
+  clearTimeout(heroA); clearTimeout(heroB);
+  heroA = setTimeout(() => {
+    if (!heroAuto || route().v !== "home") return;
+    heroFocus = false; placeSquares();
+    heroB = setTimeout(() => { heroK = (heroK + 1) % 4; heroFocus = true; placeSquares(); heroText(four, th); heroLoop(four, th); }, 1100);
+  }, 5200);
+}
+function threadHTML(p) {
+  const items = p.items.map(id => BY[id]).filter(Boolean);
+  const done = ST.played[p.id] == null ? -1 : ST.played[p.id];
+  const next = Math.min(done + 1, items.length - 1);
+  const sel = threadSel[p.id] == null ? next : threadSel[p.id];
+  const pct = items.length > 1 ? Math.max(0, (done + .5) / (items.length - 1)) * 100 : 0;
+  return `<div class="thread"><div class="ln" style="width:${(items.length - 1) * 198}px;background:linear-gradient(90deg,#FFB238 0%,#FFB238 ${pct}%,rgba(246,237,227,.28) ${pct + 6}%,rgba(246,237,227,.28) 100%)"></div>` +
+    items.map((it, j) => { const t = target(it), c = svcColor(t), on = j === sel, sv = SVC[t.svc] || SVC[t.n] || { t: "", f: "#fff" };
+      const nodeStyle = on ? `width:30px;height:30px;background:${c};color:${sv.f};box-shadow:0 0 0 4px rgba(255,178,56,.4)` : `width:16px;height:16px;background:${c};opacity:${j <= done ? .6 : 1}`;
+      return `<button class="stop" data-stop="${p.id}|${j}"><span class="art" style="${bgUrl(art(it, true))};${on ? "box-shadow:0 0 0 2px #FFB238,0 18px 40px rgba(255,150,60,.3)" : "box-shadow:0 14px 30px rgba(0,0,0,.4)"};opacity:${j <= done && !on ? .55 : 1}"></span><span class="nodewrap"><span class="node" style="${nodeStyle}">${on ? esc(sv.t) : ""}</span></span><span style="display:flex;flex-direction:column;gap:1px"><span class="tag" style="color:${j === next ? "#FFB238" : "#7E6F70"}">${j <= done ? "Watched" : j === next ? "Up next" : "&nbsp;"}</span><b style="font-size:14px">${esc(it.title)}</b><span class="mute" style="font-size:12px">${esc(it.kind === "episode" ? showOf(it).title + " · " + se(it) : "Movie")}</span></span></button>`; }).join("") + `</div>`;
+}
+const threadSel = {};
+function coverHTML(p, size) {
+  const imgs = p.items.map(id => BY[id]).filter(Boolean).slice(0, 4).map(it => art(it));
+  while (imgs.length < 4) imgs.push("");
+  return `<span class="cover" style="width:${size}px;${size ? "" : "width:100%"}">${imgs.map(u => `<span style="${bgUrl(u)}"></span>`).join("")}</span>`;
+}
+const svcDots = p => [...new Set(p.items.map(id => BY[id]).filter(Boolean).map(it => svcColor(target(it))))].slice(0, 4).map(c => `<i style="background:${c}"></i>`).join("");
+function plCard(p) { return `<a class="pl" href="#pl:${esc(p.id)}">${coverHTML(p, 180)}<span style="display:flex;flex-direction:column;gap:5px"><b class="disp" style="font-size:16px;line-height:1.1">${esc(p.name)}</b><span class="dots">${svcDots(p)}<span class="mute" style="font-size:12px;margin-left:5px">${p.items.length} title${p.items.length === 1 ? "" : "s"}</span></span></span></a>`; }
+function posterCard(it) { const t = target(it), ep = it.kind === "episode"; return `<a class="poster${ep ? " ep" : ""}" href="#t:${it.id}"><span class="img${ep ? " ep" : ""}" style="${bgUrl(art(it, ep))}"><span class="svcdot" style="background:${svcColor(t)}"></span></span><span style="display:flex;flex-direction:column;gap:1px"><b>${esc(it.title)}</b><span class="mute" style="font-size:12px">${esc(ep ? showOf(it).title + " · " + se(it) : (it.kind === "series" ? "Series" : it.year || ""))} · ${esc(t.n)}</span></span></a>`; }
+function home() {
+  const { th, four } = heroFour();
+  const cont = plOf(ST.recent) || ST.pls.find(p => p.items.some(id => (BY[id] && BY[id].themes || []).includes(th))) || ST.pls[0];
+  let h = header();
+  h += `<section class="hero" aria-label="This week's four"><div id="herotext"></div><div class="stage" aria-hidden="false">${four.map((it, j) => `<button class="sq" data-hero="${j}" aria-label="${esc(nameOf(it))}" style="${bgUrl(art(it, true))}"></button>`).join("")}</div></section>`;
+  h += `<div class="pips">${four.map((it, j) => `<button class="pip" data-hero="${j}" aria-label="Show ${esc(it.title)}"></button>`).join("")}</div>`;
+  if (cont && cont.items.length) h += `<h2 class="sec">Continue ${esc(cont.name)} <small>tap a stop to see where it plays</small><button class="btng warm" style="height:40px;margin-left:auto;font-size:14px" data-keep="${cont.id}">${svgPlay(13, "#FFB238")} Keep watching</button></h2>${threadHTML(cont)}`;
+  h += `<h2 class="sec">Your playlists <small>${ST.pls.length}</small></h2><div class="row">${ST.pls.map(plCard).join("")}<button class="pl" data-newpl="1"><span style="display:grid;place-items:center;width:180px;height:180px;border-radius:18px;border:1.5px dashed rgba(255,178,56,.45);color:var(--amber)">${svgPlus(30)}</span><b class="disp" style="font-size:16px;color:var(--amber-hi)">New playlist</b></button></div>`;
+  [th].concat(THEMES.filter(x => x !== th)).forEach(t => {
+    const list = D.items.filter(x => x.kind !== "series" && (x.themes || []).includes(t));
+    if (list.length) h += `<h2 class="sec">${esc(t)} <small>${list.length} titles</small></h2><div class="row">${list.map(posterCard).join("")}</div>`;
+  });
+  h += `<p class="credit">Starter catalog of hand-picked titles. Search of the full catalog and "Fresh this week" arrive with vene's online service. Titles, episode details and artwork: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Where to watch: <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>, checked ${esc(checkedOn())}.</p>`;
+  $("app").innerHTML = h;
+  heroText(four, th); placeSquares(); heroLoop(four, th);
+  window.__four = { four, th };
+}
+
+/* ---------- title page ---------- */
+function titlePage(id) {
+  const it = BY[id]; if (!it) return home();
+  const base = showOf(it), t = target(it), ep = it.kind === "episode", ser = it.kind === "series";
+  document.body.style.removeProperty("--bg");
+  let h = header();
+  const meta = ep ? `${base.title} · Season ${it.s} · Episode ${it.e} · ${fmtMin(it.min)}` : ser ? `Series · ${EPS(it.id).length} episodes in vene` : [it.year, fmtMin(it.min)].filter(Boolean).join(" · ");
+  h += `<section class="titlehead" style="display:flex;gap:34px;align-items:flex-start;margin-top:8px"><span style="width:${ep ? 320 : 206}px;max-width:100%;aspect-ratio:${ep ? "16/9" : "2/3"};flex:none;border-radius:20px;background:#2A1C24 center/cover;${bgUrl(art(it, ep))};box-shadow:0 34px 70px rgba(0,0,0,.6)" id="tposter"></span>
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:0"><span style="font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--amber)">${esc(ep ? "Episode" : ser ? "Series" : "Film")}${(it.themes || []).length ? " · " + esc(it.themes.join(" · ")) : ""}</span>
+    <h1 class="disp" style="margin:0;font-size:clamp(36px,5vw,60px);line-height:.95;font-weight:800;letter-spacing:-.035em">${esc(it.title)}</h1><span style="color:var(--soft)">${esc(meta)}</span>
+    ${it.ov || base.ov ? `<p style="margin:0;max-width:640px;color:#DCCDC6;line-height:1.55">${esc(it.ov || base.ov)}</p>` : ""}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">${ser ? "" : `<button class="btnp" data-play="${it.id}"><i>${svgPlay(14, "#FFB238")}</i>${esc(playLabel(t))}</button>`}
+    ${base.trailer ? `<button class="btng warm" data-trailer="${esc(base.trailer)}">Trailer</button>` : ""}${ser ? "" : `<button class="btng warm" data-add="${it.id}">${svgPlus(18)}Playlist</button>`}<button class="btng warm" data-save="${it.id}" aria-label="Save to Library" style="padding:0 15px">${svgHeart(18, ST.lib.includes(it.id))}</button></div></div></section><div id="trailerbox"></div>`;
+  // where to watch
+  const srcs = srcOf(it), chosen = t;
+  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:28px"><section class="panel warm"><div style="display:flex;justify-content:space-between"><h2 class="h3">Where to watch</h2><span class="mute" style="font-size:12px">Checked ${esc(checkedOn())}</span></div>`;
+  if (!srcs.length && !Object.keys(base.buy || {}).length) h += `<p class="mute" style="margin:6px 0">Not on any service vene tracks right now.</p>`;
+  srcs.forEach(s => { const sv = SVC[s.svc] || { t: "", c: "#9C8C8A", f: "#fff" }, isPick = !chosen.owned && chosen.svc === s.svc && (chosen.n.includes(s.via || s.svc));
+    h += `<div style="display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:14px;${isPick ? "background:rgba(255,178,56,.10);border:1px solid rgba(255,178,56,.3)" : ""}">${isPick ? `<span style="width:28px;height:28px;border-radius:999px;background:${sv.c};color:${sv.f};font:800 10px var(--body);display:grid;place-items:center;box-shadow:0 0 0 3px rgba(255,178,56,.35)">${esc(sv.t)}</span>` : `<span style="width:12px;height:12px;margin:0 8px;border-radius:999px;background:${sv.c}"></span>`}<span style="flex:1;display:flex;flex-direction:column"><b style="font-weight:${isPick ? 700 : 500}">${esc(s.svc)}${s.via ? `, inside ${esc(s.via)}` : ""}</b>${isPick ? `<span style="font-size:12px;color:var(--amber-hi)">${chosen.mine ? "Yours · " : ""}${ep ? "opens a search for the show" : "opens here"}</span>` : ""}</span><span class="mute" style="font-size:12px">${s.free ? "Free" : ST.sv.includes(s.svc) ? "In My Services" : ""}</span></div>`; });
+  const buys = Object.keys(base.buy || {});
+  if (buys.length) h += `<div style="display:flex;align-items:center;gap:12px;padding:9px 10px"><span style="width:12px;height:12px;margin:0 8px;border-radius:999px;background:#9C8C8A"></span><span style="flex:1;display:flex;flex-direction:column"><span>Rent or buy</span><span class="mute" style="font-size:12px">${buys.map(b => `<a href="${esc(base.buy[b])}">${esc(b)}</a>`).join(" · ")}</span></span></div>`;
+  h += `</section>`;
+  if (!ser) h += `<section class="panel warm"><h2 class="h3">Own it?</h2><p style="margin:0 0 12px;color:var(--soft);font-size:14px">Bought it somewhere? Pick where, and vene plays it from there first. Nothing gets connected.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${Object.keys(STORES).map(n => `<button class="chip${ST.own[base.id] === n ? " on" : ""}" data-own="${base.id}|${esc(n)}">${ST.own[base.id] === n ? "✓ " : ""}${esc(n)}</button>`).join("")}</div></section>`;
+  const inPls = ST.pls.filter(p => p.items.includes(it.id));
+  if (!ser) h += `<section class="panel warm"><h2 class="h3">In your playlists</h2>${inPls.length ? inPls.map(p => `<a href="#pl:${esc(p.id)}" style="display:flex;align-items:center;gap:12px;text-decoration:none;margin-bottom:10px">${coverHTML(p, 56)}<span style="display:flex;flex-direction:column"><b class="disp">${esc(p.name)}</b><span class="mute" style="font-size:12px">Number ${p.items.indexOf(it.id) + 1} in the lineup</span></span></a>`).join("") : `<p class="mute" style="margin:0 0 10px">Not in a playlist yet.</p>`}<button class="chip" data-add="${it.id}">${svgPlus(14)} Add to a playlist</button></section>`;
+  h += `</div>`;
+  if (ser || ep) {
+    const sh = ser ? it : base, eps = EPS(sh.id);
+    h += `<h2 class="sec">Episodes in vene <small>${esc(sh.title)}</small></h2><div class="row">${eps.map(posterCard).join("")}</div>`;
+  }
+  $("app").innerHTML = h;
+}
+
+/* ---------- playlist page ---------- */
+function playlistPage(id) {
+  const p = plOf(id); if (!p) return playlistsPage();
+  ST.recent = id; save();
+  document.body.style.removeProperty("--bg");
+  const items = p.items.map(x => BY[x]).filter(Boolean);
+  const done = ST.played[p.id] == null ? -1 : ST.played[p.id], next = Math.min(done + 1, Math.max(items.length - 1, 0));
+  const sel = threadSel[p.id] == null ? next : threadSel[p.id];
+  const mins = items.reduce((a, x) => a + (x.min || 0), 0);
+  let h = header();
+  h += `<div class="titlehead" style="display:flex;gap:40px;align-items:flex-start"><aside style="width:290px;max-width:100%;flex:none;display:flex;flex-direction:column;gap:14px">${coverHTML(p, 290)}<h1 class="disp" style="margin:6px 0 0;font-size:44px;line-height:.95;font-weight:800;letter-spacing:-.035em">${esc(p.name)}</h1><span style="display:flex;align-items:center;gap:10px"><span class="dots">${svcDots(p)}</span><span style="color:var(--soft)">${items.length} titles · about ${fmtMin(mins)}</span></span>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">${items.length ? `<button class="btnp" data-keep="${p.id}"><i>${svgPlay(14, "#FFB238")}</i>${done >= 0 ? "Keep watching" : "Play from the top"}</button><button class="btng warm" data-pickfor="${p.id}">${svgDie(19)}Pick for me</button>` : ""}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="chip" data-rename="${p.id}">Rename</button><button class="chip" data-delpl="${p.id}">Delete playlist</button>${done >= 0 ? `<button class="chip" data-reset="${p.id}">Start over</button>` : ""}</div></aside>
+    <ol class="lineup" style="flex:1;min-width:0;margin-top:8px">${items.length > 1 ? `<div class="vl" style="background:linear-gradient(180deg,#FFB238 0%,#FFB238 ${Math.max(0, (done + .5) / (items.length - 1) * 100)}%,rgba(246,237,227,.28) ${Math.max(0, (done + .5) / (items.length - 1) * 100) + 5}%,rgba(246,237,227,.28) 100%)"></div>` : ""}` +
+    items.map((it, j) => { const t = target(it), c = svcColor(t), on = j === sel, sv = SVC[t.svc] || SVC[t.n] || { t: "", f: "#fff" };
+      return `<li class="lrow" style="opacity:${j <= done && !on ? .55 : 1}"><span class="nodewrap"><span class="node" style="${on ? `width:34px;height:34px;background:${c};color:${sv.f};box-shadow:0 0 0 5px rgba(255,178,56,.35)` : `width:16px;height:16px;background:${c}`}">${on ? esc(sv.t) : ""}</span></span>
+      <button class="lcard${on ? " on" : ""}" data-sel="${p.id}|${j}"><span class="th" style="${bgUrl(art(it, true))}"></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span class="tag" style="color:${j === next ? "#FFB238" : "#7E6F70"}">${j <= done ? "Watched" : j === next ? "Up next" : "&nbsp;"}</span><b>${esc(it.title)}</b><span style="font-size:13px;color:${t.check ? "#FFCB7A" : "var(--mute)"}">${esc(it.kind === "episode" ? showOf(it).title + " · " + se(it) + " · " : it.kind === "movie" ? "Movie · " : "")}${esc(playLabel(t))}</span></span><span class="mute" style="font-size:13px">${esc(fmtMin(it.min))}</span></button>
+      <button class="ib play" data-playpl="${p.id}|${j}" aria-label="Play ${esc(it.title)}">${svgPlay(14, "#FFB238")}</button>
+      <span style="display:flex;flex-direction:column;gap:4px"><button class="ib" style="width:30px;height:24px;border-radius:8px" data-mv="${p.id}|${j}|-1" aria-label="Move up">↑</button><button class="ib" style="width:30px;height:24px;border-radius:8px" data-mv="${p.id}|${j}|1" aria-label="Move down">↓</button></span>
+      <button class="ib" data-rm="${p.id}|${j}" aria-label="Remove ${esc(it.title)}">✕</button></li>`; }).join("") +
+    `<li class="lrow"><span class="nodewrap"><span class="node" style="width:28px;height:28px;border:2px dashed rgba(255,178,56,.55);background:transparent;color:var(--amber)">+</span></span><a class="lcard" href="#browse" style="justify-content:center;border-style:dashed;border-color:rgba(255,178,56,.35);color:var(--amber);font-weight:700;text-decoration:none">Add a movie or episode to the night</a></li></ol></div>`;
+  $("app").innerHTML = h;
+}
+function playlistsPage() {
+  document.body.style.removeProperty("--bg");
+  $("app").innerHTML = header() + `<h1 class="disp" style="margin:6px 0 4px;font-size:40px;font-weight:800;letter-spacing:-.03em">Playlists</h1><p class="mute" style="margin:0 0 20px">Movies and single episodes from any service, in the order you want.</p><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">${ST.pls.map(p => plCard(p).replace('class="pl"', 'class="pl" style="width:100%"').replace(/width:180px;/, "")).join("")}<button class="pl" style="width:100%" data-newpl="1"><span style="display:grid;place-items:center;aspect-ratio:1;border-radius:18px;border:1.5px dashed rgba(255,178,56,.45);color:var(--amber)">${svgPlus(30)}</span><b class="disp" style="font-size:16px;color:var(--amber-hi)">New playlist</b></button></div>`;
+}
+
+/* ---------- browse, library, search ---------- */
+let bTheme = "";
+function browsePage() {
+  document.body.style.removeProperty("--bg");
+  const list = D.items.filter(x => x.kind !== "episode" && (!bTheme || (x.kind === "series" ? EPS(x.id).some(e => e.themes.includes(bTheme)) : (x.themes || []).includes(bTheme))));
+  $("app").innerHTML = header() + `<h1 class="disp" style="margin:6px 0 14px;font-size:40px;font-weight:800;letter-spacing:-.03em">Browse</h1><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px">${["", ...THEMES].map(t => `<button class="chip${bTheme === t ? " on" : ""}" data-theme="${t}">${t || "All"}</button>`).join("")}</div><div class="grid">${list.map(posterCard).join("")}</div>`;
+}
+function libraryPage() {
+  document.body.style.removeProperty("--bg");
+  const list = ST.lib.map(id => BY[id]).filter(Boolean);
+  $("app").innerHTML = header() + `<h1 class="disp" style="margin:6px 0 14px;font-size:40px;font-weight:800;letter-spacing:-.03em">Library</h1>${list.length ? `<div class="grid">${list.map(posterCard).join("")}</div>` : `<div class="empty">Tap the heart on any title to save it here. Saving is separate from playlists.</div>`}`;
+}
+function searchPage(q) {
+  document.body.style.removeProperty("--bg");
+  const n = q.trim().toLowerCase();
+  const res = n ? D.items.filter(x => (x.title + " " + (x.kind === "episode" ? showOf(x).title : "") + " " + (x.themes || []).join(" ")).toLowerCase().includes(n)) : [];
+  $("app").innerHTML = header() + `<h1 class="disp" style="margin:6px 0 6px;font-size:36px;font-weight:800">Search</h1><p class="mute" style="margin:0 0 18px">Searching vene's starter catalog. Searching every movie and show arrives with vene's online service.</p>${n ? (res.length ? `<div class="grid">${res.map(posterCard).join("")}</div>` : `<div class="empty">Nothing in the starter catalog matches "${esc(q)}" yet.</div>`) : ""}`;
+  const i = $("q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+}
+
+/* ---------- my services ---------- */
+function servicesPage() {
+  document.body.style.removeProperty("--bg");
+  let h = header() + `<h1 class="disp" style="margin:6px 0 4px;font-size:40px;font-weight:800;letter-spacing:-.03em">My Services</h1><p class="mute" style="margin:0 0 20px">Turn on what you use and tell vene how you get it. Nothing is connected or checked.</p>`;
+  h += `<section class="panel warm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:4px 12px">` + SUBS.map(n => { const on = ST.sv.includes(n), sv = SVC[n], hosts = VIAOPT[n] || [], via = ST.via[n] || null;
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:16px"><span style="width:12px;height:12px;border-radius:999px;background:${sv.c};opacity:${on ? 1 : .35};margin:0 6px;flex:none"></span><b style="width:100px;flex:none;opacity:${on ? 1 : .5}">${esc(n)}</b><span style="flex:1;display:flex;gap:2px;flex-wrap:wrap">${on && hosts.length ? [null, ...hosts].map(x => `<button class="seg${via === x ? " on" : ""}" data-via="${esc(n)}|${x || ""}">${x ? "Through " + esc(x) : "Own app"}</button>`).join("") : ""}</span><button class="toggle${on ? " on" : ""}" role="switch" aria-checked="${on}" aria-label="${esc(n)}" data-sv="${esc(n)}"><i></i></button></div>`; }).join("") + `</section>`;
+  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:18px"><section class="panel warm"><h2 class="h3">Free with ads · no account needed</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${FREE.map(n => `<button class="chip${ST.sv.includes(n) ? " on" : ""}" data-sv="${esc(n)}"><span style="width:9px;height:9px;border-radius:999px;background:${SVC[n].c}"></span>${ST.sv.includes(n) ? "✓ " : ""}${esc(n === "YouTube" ? "YouTube free movies" : n)}</button>`).join("")}</div></section>`;
+  h += `<section class="panel warm"><h2 class="h3">Titles you own</h2>${Object.keys(ST.own).length ? Object.entries(ST.own).map(([id, s]) => BY[id] ? `<div style="display:flex;justify-content:space-between;padding:6px 0"><a href="#t:${id}">${esc(BY[id].title)}</a><span class="mute">${esc(s)}</span></div>` : "").join("") : `<p class="mute" style="margin:0">Use "Own it?" on a title page to add purchases.</p>`}</section></div>`;
+  h += `<p class="credit">This product uses the TMDB API but is not endorsed or certified by TMDB. Where-to-watch data from <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>. Saved on this device only for now.</p>`;
+  $("app").innerHTML = h;
+}
+
+/* ---------- add-to-playlist sheet ---------- */
+let sheetId = null;
+function openSheet(id) {
+  sheetId = id; const it = BY[id];
+  $("sheetbox").innerHTML = `<span style="display:block;width:40px;height:5px;border-radius:999px;background:rgba(246,237,227,.3);margin:0 auto 14px"></span><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><span style="width:72px;height:41px;border-radius:9px;flex:none;background:#2A1C24 center/cover;${bgUrl(art(it, true))}"></span><span style="min-width:0"><b style="display:block">${esc(it.title)}</b><span class="mute" style="font-size:12px">${esc(it.kind === "episode" ? showOf(it).title + " · " + se(it) : "Movie")}</span></span></div>
+  <h2 class="disp" style="margin:0 0 12px;font-size:22px">Add to playlist</h2>
+  <form id="newplform" style="display:flex;gap:8px;margin-bottom:12px"><input id="newplname" class="warm" placeholder="New playlist name" aria-label="New playlist name" style="flex:1;border-radius:14px;padding:12px 14px;color:var(--ink);font:500 15px var(--body);outline:none"><button class="btnp" style="height:46px;padding:0 18px">Create</button></form>
+  <div style="display:flex;flex-direction:column;gap:4px">${ST.pls.map(p => { const on = p.items.includes(id); return `<button data-tgl="${p.id}" style="display:flex;align-items:center;gap:14px;padding:8px;border-radius:16px;border:0;background:${on ? "rgba(255,178,56,.08)" : "transparent"};cursor:pointer;text-align:left">${coverHTML(p, 52)}<span style="flex:1"><b class="disp">${esc(p.name)}</b><span style="display:block;font-size:12px;color:${on ? "var(--amber-hi)" : "var(--mute)"}">${on ? "Added · number " + (p.items.indexOf(id) + 1) + " in the lineup" : p.items.length + " titles"}</span></span><span style="width:28px;height:28px;border-radius:999px;border:2px solid ${on ? "var(--amber)" : "rgba(255,226,200,.3)"};background:${on ? "var(--amber)" : "transparent"};display:grid;place-items:center;color:#24160A;font-weight:900">${on ? "✓" : ""}</span></button>`; }).join("")}</div>
+  <button class="btnp" style="width:100%;justify-content:center;margin-top:16px;padding:0" data-closesheet="1">Done</button>`;
+  $("sheet").hidden = false;
+}
+const closeSheet = () => { $("sheet").hidden = true; sheetId = null; render(); };
+
+/* ---------- render + events ---------- */
+function rail(v) {
+  $("rail").innerHTML = NAV.map(([k, label, path]) => `<a class="navb${(v === k || (k === "playlists" && v === "pl") || (k === "browse" && v === "t")) ? " on" : ""}" href="#${k}" aria-label="${label}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${path}</svg><span>${label}</span></a>`).join("");
+}
+function render() {
+  const { v, arg } = route();
+  if (v !== "home") { clearTimeout(heroA); clearTimeout(heroB); }
+  rail(v);
+  if (v === "t") titlePage(arg); else if (v === "pl") playlistPage(arg); else if (v === "playlists") playlistsPage(); else if (v === "browse") browsePage(); else if (v === "library") libraryPage(); else if (v === "search") searchPage(arg); else if (v === "services") servicesPage(); else home();
+}
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); });
+window.addEventListener("resize", () => { if (route().v === "home") placeSquares(); });
+let qT;
+document.addEventListener("input", e => { if (e.target.id === "q") { clearTimeout(qT); const v = e.target.value; qT = setTimeout(() => { history.replaceState(null, "", "#search:" + encodeURIComponent(v)); render(); }, 250); } });
+document.addEventListener("submit", e => {
+  if (e.target.id === "newplform") { e.preventDefault(); const n = $("newplname").value.trim(); if (!n) return; const p = { id: "u" + ST.pid++, name: n, items: sheetId ? [sheetId] : [] }; ST.pls.push(p); save(); toast("Created " + n); openSheet(sheetId); }
+});
+document.addEventListener("click", e => {
+  if (e.target === $("sheet")) return closeSheet();
+  const b = e.target.closest("button,[data-go]"); if (!b) return;
+  const d = b.dataset;
+  if (d.go) return go(d.go);
+  if (d.hero != null) { heroAuto = false; clearTimeout(heroA); clearTimeout(heroB); heroK = +d.hero; heroFocus = true; placeSquares(); heroText(window.__four.four, window.__four.th); return; }
+  if (d.play) return play(BY[d.play]);
+  if (d.playpl) { const [pid, j] = d.playpl.split("|"); return play(BY[plOf(pid).items[+j]], pid); }
+  if (d.keep) { const p = plOf(d.keep); const done = ST.played[p.id] == null ? -1 : ST.played[p.id]; const j = Math.min(done + 1, p.items.length - 1); return play(BY[p.items[j]], p.id); }
+  if (d.pickfor) { const p = plOf(d.pickfor); const it = BY[p.items[Math.floor(Math.random() * p.items.length)]]; toast("How about " + it.title + "?"); threadSel[p.id] = p.items.indexOf(it.id); return render(); }
+  if (d.stop) { const [pid, j] = d.stop.split("|"); if (threadSel[pid] === +j) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
+  if (d.sel) { const [pid, j] = d.sel.split("|"); if (threadSel[pid] === +j) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
+  if (d.mv) { const [pid, j, dir] = d.mv.split("|"); const p = plOf(pid), i = +j, k = i + +dir; if (k < 0 || k >= p.items.length) return; [p.items[i], p.items[k]] = [p.items[k], p.items[i]]; threadSel[pid] = k; save(); return render(); }
+  if (d.rm) { const [pid, j] = d.rm.split("|"); const p = plOf(pid); const t = BY[p.items[+j]]; p.items.splice(+j, 1); if (ST.played[pid] >= +j) ST.played[pid]--; delete threadSel[pid]; save(); toast("Removed " + t.title); return render(); }
+  if (d.reset) { delete ST.played[d.reset]; delete threadSel[d.reset]; save(); return render(); }
+  if (d.rename) { const p = plOf(d.rename); const n = window.prompt("Rename playlist", p.name); if (n && n.trim()) { p.name = n.trim(); save(); render(); } return; }
+  if (d.delpl) { const p = plOf(d.delpl); if (window.confirm("Delete " + p.name + "?")) { ST.pls = ST.pls.filter(x => x !== p); save(); go("playlists"); } return; }
+  if (d.newpl) { const n = window.prompt("Name your playlist"); if (n && n.trim()) { const p = { id: "u" + ST.pid++, name: n.trim(), items: [] }; ST.pls.push(p); save(); go("pl:" + p.id); } return; }
+  if (d.add) return openSheet(d.add);
+  if (d.tgl) { const p = plOf(d.tgl); const i = p.items.indexOf(sheetId); if (i > -1) p.items.splice(i, 1); else p.items.push(sheetId); save(); return openSheet(sheetId); }
+  if (d.closesheet) return closeSheet();
+  if (d.save) { const i = ST.lib.indexOf(d.save); if (i > -1) { ST.lib.splice(i, 1); toast("Removed from Library"); } else { ST.lib.push(d.save); toast("Saved to Library"); } save(); return render(); }
+  if (d.own) { const [id, n] = d.own.split("|"); if (ST.own[id] === n) { delete ST.own[id]; toast("Removed from your purchases"); } else { ST.own[id] = n; toast("Plays from " + n + " first"); } save(); return render(); }
+  if (d.trailer) { const box = $("trailerbox"); if (box.innerHTML) { box.innerHTML = ""; return; } box.innerHTML = `<div style="margin-top:22px;max-width:760px;aspect-ratio:16/9;border-radius:20px;overflow:hidden;box-shadow:0 30px 60px rgba(0,0,0,.6)"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&playsinline=1&rel=0" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:0"></iframe></div>`; return; }
+  if (d.sv) { const i = ST.sv.indexOf(d.sv); if (i > -1) ST.sv.splice(i, 1); else ST.sv.push(d.sv); save(); return render(); }
+  if (d.via) { const [n, x] = d.via.split("|"); if (x) ST.via[n] = x; else delete ST.via[n]; save(); toast(x ? n + " will open in " + x : n + " will open in its own app"); return render(); }
+  if (d.theme != null) { bTheme = d.theme; return render(); }
+});
+render();
+</script>
+</body>
+</html>
