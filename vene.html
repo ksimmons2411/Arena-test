@@ -171,7 +171,7 @@ html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
 #splash .mv{transition:transform 820ms cubic-bezier(.65,0,.25,1)}
 #splash .w{transition:opacity 500ms ease 250ms}
 #splash .arm{transform-origin:11px 28.75px}
-#splash.open .g{transform:translate(37px,-10.75px)}
+#splash.open .g{transform:translate(29.2px,-7.75px)} /* the line sits on the logo's visual center (40.2, 21) */
 #splash.open .la{transform:rotate(-57.3deg)}
 #splash.open .ra{transform:rotate(57.3deg)}
 #splash.open .ld{transform:translate(-11.13px,15.9px)}
@@ -198,7 +198,7 @@ html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
 </style>
 </head>
 <body>
-<div id="splash" class="open" aria-hidden="true"><svg viewBox="0 0 96 36"><g class="mv g"><g class="mv arm la"><path d="M11 28.75L4.25 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv arm ra"><path d="M11 28.75L17.75 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv ld"><circle cx="4.25" cy="12.85" r="1.8" fill="#FFB238"/></g><g class="mv rd"><circle cx="17.75" cy="12.85" r="1.8" fill="#FFB238"/></g></g><text class="w" x="21.5" y="31" font-family="Nunito, system-ui, sans-serif" font-weight="800" font-size="31" letter-spacing="-0.6" fill="#F6EDE3">ene.</text></svg></div>
+<div id="splash" class="open" aria-hidden="true"><svg viewBox="-7.8 3 96 36"><g class="mv g"><g class="mv arm la"><path d="M11 28.75L4.25 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv arm ra"><path d="M11 28.75L17.75 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv ld"><circle cx="4.25" cy="12.85" r="1.8" fill="#FFB238"/></g><g class="mv rd"><circle cx="17.75" cy="12.85" r="1.8" fill="#FFB238"/></g></g><text class="w" x="21.5" y="31" font-family="Nunito, system-ui, sans-serif" font-weight="800" font-size="31" letter-spacing="-0.6" fill="#F6EDE3">ene.</text></svg></div>
 <script>(function () { // play once each time vene is opened (not on its own reloads)
   const s = document.getElementById("splash"); let seen = null;
   try { seen = sessionStorage.getItem("vene.opened"); sessionStorage.setItem("vene.opened", "1"); } catch (e) {}
