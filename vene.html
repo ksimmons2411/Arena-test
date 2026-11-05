@@ -187,6 +187,7 @@ html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
 <div id="toast" role="status" hidden></div>
 <script>if (/veneTV/.test(navigator.userAgent) || /[?&]tv=1/.test(location.search)) { document.documentElement.classList.add("tv"); document.querySelector('meta[name=viewport]').content = "width=1600"; }</script>
 <script src="vene-data.js"></script>
+<script src="supabase-2.45.4.js"></script>
 <script>
 "use strict";
 /* ---------- data ---------- */
@@ -220,7 +221,8 @@ const ST = { sv: ["Netflix", "Hulu", "Disney+", "Prime Video", "YouTube", "Tubi"
 try { Object.assign(ST, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
 if (!ST.links) ST.links = {};
 if (!Array.isArray(ST.pls)) ST.pls = D.playlists.map(p => ({ id: p.id, name: p.name, items: p.items.slice() }));
-const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) {} };
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) {} try { syncPush(); } catch (e) {} };
+const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); // unique across devices
 const plOf = id => ST.pls.find(p => p.id === id);
 
 /* ---------- helpers ---------- */
@@ -286,7 +288,7 @@ function route() { let h = location.hash.slice(1); try { h = decodeURIComponent(
 const go = h => { location.hash = h; };
 function header() {
   const inner = ["t", "pl", "services", "search", "link"].includes(route().v);
-  return `<header class="top">${inner ? `<button class="ib" data-back="1" aria-label="Back" style="width:44px;height:44px">${'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>'}</button>` : ""}${LOGO(34)}<label class="search warm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search movies, shows, episodes" aria-label="Search" value="${esc(route().v === "search" ? route().arg : "")}"></label><button class="ib" data-addlink="1" aria-label="Add an episode link you copied" title="Add an episode link you copied" style="width:44px;height:44px;margin-left:auto"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button><button class="me" style="margin-left:0" data-go="services" aria-label="Profile and My Services"><b>Krystal</b><span class="avatar"></span></button></header>`;
+  return `<header class="top">${inner ? `<button class="ib" data-back="1" aria-label="Back" style="width:44px;height:44px">${'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>'}</button>` : ""}${LOGO(34)}<label class="search warm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search movies, shows, episodes" aria-label="Search" value="${esc(route().v === "search" ? route().arg : "")}"></label><button class="ib" data-addlink="1" aria-label="Add an episode link you copied" title="Add an episode link you copied" style="width:44px;height:44px;margin-left:auto"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button><button class="me" style="margin-left:0" data-go="services" aria-label="Profile and My Services"><b>${esc(ST.name || (SYNC.user ? SYNC.user.email.split("@")[0] : "Sign in"))}</b><span class="avatar"></span></button></header>`;
 }
 
 /* ---------- home ---------- */
@@ -494,9 +496,102 @@ function linkPage(raw) {
 const epRow = (e, u) => `<button class="lcard" data-linkto="${e.id}" data-u="${esc(u)}"><span class="th" style="${bgUrl(art(e, true))}"></span><span class="ltxt"><b>${esc(e.title)}</b><span class="mute" style="font-size:13px">${esc(se(e))}${linkOf(e.id) ? " · already linked" : ""}</span></span><span class="chip on" style="pointer-events:none">This one</span></button>`;
 
 /* ---------- my services ---------- */
+/* ---------- account + sync (Supabase: email code sign-in, each person's row locked to them) ---------- */
+const SB_URL = "https://sqfzaeysifhhnlhbngfx.supabase.co", SB_KEY = "sb_publishable_V5Z7RmGmbNizJn5aQyik6g_VetzDUyr";
+const SYNC_KEYS = ["name", "sv", "via", "own", "lib", "pls", "played", "recent", "links", "lastShow"];
+const SYNC = { sb: null, user: null, at: null, err: "", step: null, email: "", busy: false, pushT: null, remoteAt: null };
+try { if (window.supabase) SYNC.sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "vene.auth" } }); } catch (e) {}
+try { SYNC.remoteAt = localStorage.getItem("vene.syncAt"); } catch (e) {}
+const snapshot = () => { const o = {}; SYNC_KEYS.forEach(k => { if (ST[k] !== undefined) o[k] = ST[k]; }); return o; };
+function syncPush() {
+  if (!SYNC.sb || !SYNC.user || SYNC.applying) return;
+  clearTimeout(SYNC.pushT);
+  SYNC.pushT = setTimeout(async () => {
+    const { data, error } = await SYNC.sb.from("vene_state").upsert({ user_id: SYNC.user.id, data: snapshot() }).select("updated_at").maybeSingle();
+    if (error) { SYNC.err = /row-level|42501|permission/i.test(error.message + error.code) ? "This email isn't on the vene family list yet." : "Couldn't sync just now. Your changes are saved on this device."; }
+    else { SYNC.err = ""; SYNC.at = new Date(); if (data) { SYNC.remoteAt = data.updated_at; try { localStorage.setItem("vene.syncAt", data.updated_at); } catch (e) {} } }
+    if (route().v === "services") refreshAccount();
+  }, 1200);
+}
+function mergeFirst(remote) { // first sign-in on this device: keep what's here and what's in the account
+  const r = remote || {}, out = Object.assign({}, snapshot(), r);
+  const ids = new Set((r.pls || []).map(p => p.id));
+  out.pls = (r.pls || []).concat((ST.pls || []).filter(p => !ids.has(p.id)));
+  out.lib = [...new Set([...(r.lib || []), ...(ST.lib || [])])];
+  out.links = Object.assign({}, ST.links, r.links); out.own = Object.assign({}, ST.own, r.own);
+  out.name = r.name || ST.name;
+  return out;
+}
+function applyRemote(d) {
+  SYNC.applying = true; SYNC_KEYS.forEach(k => { if (d[k] !== undefined) ST[k] = d[k]; });
+  if (!Array.isArray(ST.pls)) ST.pls = []; if (!ST.links) ST.links = {};
+  save(); SYNC.applying = false;
+}
+const busyNow = () => tvMove || drag || !$("sheet").hidden || (document.activeElement && document.activeElement.tagName === "INPUT");
+async function syncPull(first) {
+  if (!SYNC.sb || !SYNC.user) return;
+  const { data, error } = await SYNC.sb.from("vene_state").select("data,updated_at").eq("user_id", SYNC.user.id).maybeSingle();
+  if (error) { SYNC.err = "Couldn't reach your account just now."; return; }
+  const mergedFor = (() => { try { return localStorage.getItem("vene.mergedFor"); } catch (e) { return null; } })();
+  if (first || mergedFor !== SYNC.user.id) {
+    applyRemote(mergeFirst(data && data.data)); try { localStorage.setItem("vene.mergedFor", SYNC.user.id); } catch (e) {}
+    syncPush(); render(); return;
+  }
+  if (data && data.updated_at !== SYNC.remoteAt) {
+    if (busyNow()) return; // try again on the next check
+    SYNC.remoteAt = data.updated_at; try { localStorage.setItem("vene.syncAt", data.updated_at); } catch (e) {}
+    applyRemote(data.data); SYNC.at = new Date();
+    const y = scrollY, f = document.activeElement, key = f && (f.dataset.stop || f.dataset.sel || f.getAttribute("href"));
+    render(); scrollTo(0, y);
+    if (isTV() && key) { const g = document.querySelector(`[data-stop="${key}"],[data-sel="${key}"],[href="${CSS.escape(key)}"]`); if (g) g.focus({ preventScroll: true }); else tvFocus(); }
+  } else if (!data) syncPush();
+}
+if (SYNC.sb) {
+  SYNC.sb.auth.getSession().then(({ data }) => { SYNC.user = data.session ? data.session.user : null; if (SYNC.user) { syncPull(); render(); } });
+  SYNC.sb.auth.onAuthStateChange((ev, session) => { const was = SYNC.user; SYNC.user = session ? session.user : null; if (ev === "SIGNED_IN" && !was) syncPull(true); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncPull(); });
+  window.addEventListener("focus", () => syncPull());
+  setInterval(() => { if (document.visibilityState === "visible") syncPull(); }, 30000);
+}
+const ago = d => { if (!d) return ""; const m = Math.round((Date.now() - d) / 60000); return m < 1 ? "just now" : m === 1 ? "a minute ago" : m < 60 ? m + " minutes ago" : "a while ago"; };
+function accountPanel() {
+  let h = `<section id="acct" class="panel warm" style="margin:6px 0 22px">`;
+  if (!SYNC.sb) return h + `<h2 class="h3">Your account</h2><p class="mute" style="margin:0">Sign-in couldn't load. Check the internet connection and reopen vene.</p></section>`;
+  if (SYNC.user) {
+    h += `<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><span class="avatar" style="width:52px;height:52px"></span><span style="flex:1;min-width:200px"><b class="disp" style="font-size:22px;display:block">${esc(ST.name || "You")}</b><span class="mute">${esc(SYNC.user.email)}${SYNC.err ? "" : SYNC.at ? " · synced " + ago(SYNC.at) : " · synced"}</span>${SYNC.err ? `<span style="display:block;color:#FFB238;margin-top:4px">${esc(SYNC.err)}</span>` : ""}</span><button class="chip" data-rename-me="1">Change name</button><button class="chip" data-signout="1">Sign out</button></div>`;
+    return h + `<p class="mute" style="margin:12px 0 0;font-size:13px">Your playlists, services, saved titles and episode links follow you to every device you sign in on. Only you can see them.</p></section>`;
+  }
+  h += `<h2 class="h3">Sign in to sync your devices</h2><p class="mute" style="margin:0 0 14px">Sign in on your phone, iPad and TV with the same email and your playlists show up everywhere. vene emails you a code, so there's no password to remember.</p>`;
+  if (SYNC.step === "code") h += `<form id="codeform" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input id="codein" class="warm" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="Code from the email" aria-label="Code from the email" style="width:240px;border-radius:14px;padding:12px 14px;color:var(--ink);font:700 18px var(--body);letter-spacing:.2em;outline:none"><button class="btnp" ${SYNC.busy ? "disabled" : ""}>Sign in</button><button type="button" class="chip" data-authback="1">Use a different email</button><span class="mute" style="flex-basis:100%;font-size:13px">Sent to ${esc(SYNC.email)}. It can take a minute; check spam too.</span></form>`;
+  else h += `<form id="emailform" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input id="namein" class="warm" placeholder="Your first name" aria-label="Your first name" value="${esc(ST.name || "")}" style="width:200px;border-radius:14px;padding:12px 14px;color:var(--ink);font:500 16px var(--body);outline:none"><input id="emailin" class="warm" type="email" inputmode="email" autocomplete="email" placeholder="Email" aria-label="Email" value="${esc(SYNC.email)}" style="flex:1;min-width:240px;border-radius:14px;padding:12px 14px;color:var(--ink);font:500 16px var(--body);outline:none"><button class="btnp" ${SYNC.busy ? "disabled" : ""}>Email me a code</button></form>`;
+  if (SYNC.err) h += `<p style="margin:10px 0 0;color:#FFB238">${esc(SYNC.err)}</p>`;
+  return h + `</section>`;
+}
+function refreshAccount() { const a = $("acct"); if (!a) return; const f = document.activeElement && document.activeElement.id; a.outerHTML = accountPanel(); if (f && $(f)) $(f).focus(); }
+async function sendCode() {
+  const email = $("emailin").value.trim().toLowerCase(), name = $("namein").value.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { SYNC.err = "That email doesn't look right."; return refreshAccount(); }
+  if (name) { ST.name = name; save(); }
+  SYNC.busy = true; SYNC.err = ""; refreshAccount();
+  const { error } = await SYNC.sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  SYNC.busy = false;
+  if (error) SYNC.err = /rate|limit|seconds/i.test(error.message) ? "Too many codes sent recently. Wait a bit and try again." : "Couldn't send the code: " + error.message;
+  else { SYNC.step = "code"; SYNC.email = email; }
+  refreshAccount(); if ($("codein")) $("codein").focus();
+}
+async function checkCode() {
+  const token = $("codein").value.replace(/\D/g, "");
+  if (token.length < 6) { SYNC.err = "Type the whole code from the email."; return refreshAccount(); }
+  SYNC.busy = true; SYNC.err = ""; refreshAccount();
+  const { data, error } = await SYNC.sb.auth.verifyOtp({ email: SYNC.email, token, type: "email" });
+  SYNC.busy = false;
+  if (error) { SYNC.err = /expired|invalid/i.test(error.message) ? "That code didn't work or has expired. Check it, or send a new one." : "Couldn't sign in: " + error.message; return refreshAccount(); }
+  SYNC.user = data.user; SYNC.step = null; toast("Signed in. Syncing your playlists");
+  await syncPull(true);
+}
 function servicesPage() {
   document.body.style.removeProperty("--bg");
-  let h = header() + `<h1 class="disp" style="margin:6px 0 4px;font-size:40px;font-weight:800;letter-spacing:-.03em">My Services</h1><p class="mute" style="margin:0 0 20px">Turn on what you use and tell vene how you get it. Nothing is connected or checked.</p>`;
+  let h = header() + accountPanel() + `<h1 class="disp" style="margin:6px 0 4px;font-size:40px;font-weight:800;letter-spacing:-.03em">My Services</h1><p class="mute" style="margin:0 0 20px">Turn on what you use and tell vene how you get it. Nothing is connected or checked.</p>`;
   h += `<section class="panel warm" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:4px 12px">` + SUBS.map(n => { const on = ST.sv.includes(n), sv = SVC[n], hosts = VIAOPT[n] || [], via = ST.via[n] || null;
     return `<div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:16px"><span style="width:12px;height:12px;border-radius:999px;background:${sv.c};opacity:${on ? 1 : .35};margin:0 6px;flex:none"></span><b style="width:100px;flex:none;opacity:${on ? 1 : .5}">${esc(n)}</b><span style="flex:1;display:flex;gap:2px;flex-wrap:wrap">${on && hosts.length ? [null, ...hosts].map(x => `<button class="seg${via === x ? " on" : ""}" data-via="${esc(n)}|${x || ""}">${x ? "Through " + esc(x) : "Own app"}</button>`).join("") : ""}</span><button class="toggle${on ? " on" : ""}" role="switch" aria-checked="${on}" aria-label="${esc(n)}" data-sv="${esc(n)}"><i></i></button></div>`; }).join("") + `</section>`;
   if (isTV() && window.VeneTV) { const m = +VeneTV.getHulu(), W = ["Straight to the title", "Let Fire TV choose", "Open Hulu first, then the title"];
@@ -505,7 +600,7 @@ function servicesPage() {
   h += `<section class="panel warm"><h2 class="h3">Titles you own</h2>${Object.keys(ST.own).length ? Object.entries(ST.own).map(([id, s]) => BY[id] ? `<div style="display:flex;justify-content:space-between;padding:6px 0"><a href="#t:${id}">${esc(BY[id].title)}</a><span class="mute">${esc(s)}</span></div>` : "").join("") : `<p class="mute" style="margin:0">Use "Own it?" on a title page to add purchases.</p>`}</section></div>`;
   const mine = Object.keys(ST.links).filter(id => BY[id]);
   h += `<section class="panel warm" style="margin-top:18px"><h2 class="h3">Episode links</h2><p style="margin:0 0 12px;color:var(--soft);font-size:14px">You've linked ${mine.length} episode${mine.length === 1 ? "" : "s"}; ${Object.keys(D.links || {}).length} more are linked for everyone. Share yours so everyone who uses vene gets them.</p><button class="btnp" style="height:44px" data-sharelinks="1"${mine.length ? "" : " disabled"}><i style="width:30px;height:30px">${svgPlus(13)}</i>Share my links</button></section>`;
-  h += `<p class="credit">This product uses the TMDB API but is not endorsed or certified by TMDB. Where-to-watch data from <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>. Saved on this device only for now.</p>`;
+  h += `<p class="credit">This product uses the TMDB API but is not endorsed or certified by TMDB. Where-to-watch data from <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>. ${SYNC.user ? "Synced to your account." : "Saved on this device until you sign in."}</p>`;
   $("app").innerHTML = h;
 }
 
@@ -646,7 +741,9 @@ document.addEventListener("focusin", e => { if (!isTV() || !e.target.scrollIntoV
 document.addEventListener("submit", e => {
   if (e.target.classList.contains("pickform")) { e.preventDefault(); const u = extractUrl(e.target.elements.u.value); if (u && hostSvc(u)) go("link:" + encodeURIComponent(u)); else toast("That doesn't look like a streaming app's link"); return; }
   if (e.target.classList.contains("linkform")) { e.preventDefault(); const u = extractUrl(e.target.elements.u.value); if (!u || !hostSvc(u)) { toast("That doesn't look like a streaming app's Share link"); return; } ST.links[e.target.dataset.id] = u; save(); toast("Saved. Play opens this exact episode"); return render(); }
-  if (e.target.id === "newplform") { e.preventDefault(); const n = $("newplname").value.trim(); if (!n) return; const p = { id: "u" + ST.pid++, name: n, items: sheetId ? [sheetId] : [] }; ST.pls.push(p); save(); toast("Created " + n); openSheet(sheetId); }
+  if (e.target.id === "emailform") { e.preventDefault(); sendCode(); return; }
+  if (e.target.id === "codeform") { e.preventDefault(); checkCode(); return; }
+  if (e.target.id === "newplform") { e.preventDefault(); const n = $("newplname").value.trim(); if (!n) return; const p = { id: newId(), name: n, items: sheetId ? [sheetId] : [] }; ST.pls.push(p); save(); toast("Created " + n); openSheet(sheetId); }
 });
 document.addEventListener("click", e => {
   if (justDragged) { justDragged = false; e.preventDefault(); return; }
@@ -671,6 +768,9 @@ document.addEventListener("click", e => {
   if (d.pickfor) { const p = plOf(d.pickfor); const it = BY[p.items[Math.floor(Math.random() * p.items.length)]]; toast("How about " + it.title + "?"); threadSel[p.id] = p.items.indexOf(it.id); return render(); }
   if (d.stop) { const [pid, j] = d.stop.split("|"); if (threadSel[pid] === +j || document.documentElement.classList.contains("tv")) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
   if (d.sel) { const [pid, j] = d.sel.split("|"); if (threadSel[pid] === +j) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
+  if (d.signout) { SYNC.sb.auth.signOut().then(() => { SYNC.user = null; SYNC.at = null; try { localStorage.removeItem("vene.mergedFor"); } catch (er) {} toast("Signed out. Your things stay on this device"); render(); }); return; }
+  if (d.authback) { SYNC.step = null; SYNC.err = ""; return refreshAccount(); }
+  if (d.renameMe) { const n = window.prompt("Your name", ST.name || ""); if (n && n.trim()) { ST.name = n.trim(); save(); render(); } return; }
   if (d.hulu) { VeneTV.setHulu(+d.hulu); toast("Hulu will open with way " + d.hulu); render(); const c = document.querySelector(`[data-hulu="${d.hulu}"]`); if (c) c.focus(); return; }
   if (d.tvmove) { const [pid, j] = d.tvmove.split("|"); tvMove = { pid, j: +j }; render(); const b = document.querySelector(`[data-tvmove="${pid}|${j}"]`); if (b) b.focus(); return; }
   if (d.mv) { const [pid, j, dir] = d.mv.split("|"); const p = plOf(pid), i = +j, k = i + +dir; if (k < 0 || k >= p.items.length) return; [p.items[i], p.items[k]] = [p.items[k], p.items[i]]; threadSel[pid] = k; save(); return render(); }
@@ -679,7 +779,7 @@ document.addEventListener("click", e => {
   if (d.reset) { delete ST.played[d.reset]; delete threadSel[d.reset]; save(); return render(); }
   if (d.rename) { const p = plOf(d.rename); const n = window.prompt("Rename playlist", p.name); if (n && n.trim()) { p.name = n.trim(); save(); render(); } return; }
   if (d.delpl) { const p = plOf(d.delpl); if (window.confirm("Delete " + p.name + "?")) { ST.pls = ST.pls.filter(x => x !== p); save(); go("playlists"); } return; }
-  if (d.newpl) { const n = window.prompt("Name your playlist"); if (n && n.trim()) { const p = { id: "u" + ST.pid++, name: n.trim(), items: [] }; ST.pls.push(p); save(); go("pl:" + p.id); } return; }
+  if (d.newpl) { const n = window.prompt("Name your playlist"); if (n && n.trim()) { const p = { id: newId(), name: n.trim(), items: [] }; ST.pls.push(p); save(); go("pl:" + p.id); } return; }
   if (d.add) return openSheet(d.add);
   if (d.tgl) { const p = plOf(d.tgl); const i = p.items.indexOf(sheetId); if (i > -1) p.items.splice(i, 1); else p.items.push(sheetId); save(); return openSheet(sheetId); }
   if (d.closesheet) return closeSheet();
