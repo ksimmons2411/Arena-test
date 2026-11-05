@@ -165,6 +165,20 @@ html.tv .touchonly{display:none!important}
 html.tv .lrow.moving .lcard{transform:scale(1.02);box-shadow:0 0 0 3px #FFB238,0 24px 50px rgba(0,0,0,.55);background:rgba(40,28,34,.96)}
 html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
 .mvb{font-size:18px;font-weight:800}
+/* opening: the line with its two dots comes together into vene. */
+#splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(55% 50% at 50% 45%,rgba(255,150,60,.20) 0%,rgba(255,150,60,.04) 50%,rgba(18,14,20,0) 80%),linear-gradient(180deg,#1A1218 0%,#120E14 60%,#0C090D 100%);transition:opacity 420ms ease}
+#splash svg{width:min(64vw,520px);height:auto;overflow:visible}
+#splash .mv{transition:transform 820ms cubic-bezier(.65,0,.25,1)}
+#splash .w{transition:opacity 500ms ease 250ms}
+#splash .arm{transform-origin:11px 28.75px}
+#splash.open .g{transform:translate(37px,-10.75px)}
+#splash.open .la{transform:rotate(-57.3deg)}
+#splash.open .ra{transform:rotate(57.3deg)}
+#splash.open .ld{transform:translate(-11.13px,15.9px)}
+#splash.open .rd{transform:translate(11.13px,15.9px)}
+#splash.open .w{opacity:0;transition:none}
+#splash.gone{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){#splash{display:none}}
 /* phone */
 @media (max-width:760px){
   #app{padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px))}
@@ -184,6 +198,18 @@ html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
 </style>
 </head>
 <body>
+<div id="splash" class="open" aria-hidden="true"><svg viewBox="0 0 96 36"><g class="mv g"><g class="mv arm la"><path d="M11 28.75L4.25 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv arm ra"><path d="M11 28.75L17.75 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv ld"><circle cx="4.25" cy="12.85" r="1.8" fill="#FFB238"/></g><g class="mv rd"><circle cx="17.75" cy="12.85" r="1.8" fill="#FFB238"/></g></g><text class="w" x="21.5" y="31" font-family="Nunito, system-ui, sans-serif" font-weight="800" font-size="31" letter-spacing="-0.6" fill="#F6EDE3">ene.</text></svg></div>
+<script>(function () { // play once each time vene is opened (not on its own reloads)
+  const s = document.getElementById("splash"); let seen = null;
+  try { seen = sessionStorage.getItem("vene.opened"); sessionStorage.setItem("vene.opened", "1"); } catch (e) {}
+  if (seen) { s.remove(); return; }
+  const done = () => { s.classList.add("gone"); setTimeout(() => s.remove(), 450); };
+  s.addEventListener("click", done);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    setTimeout(() => s.classList.remove("open"), 450);
+    setTimeout(done, 2050);
+  }));
+})();</script>
 <nav id="rail" class="warm" aria-label="Main"></nav>
 <main id="app"></main>
 <div id="sheet" hidden><div class="box" id="sheetbox"></div></div>
