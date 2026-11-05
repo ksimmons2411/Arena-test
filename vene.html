@@ -546,6 +546,10 @@ async function syncPull(first) {
     if (isTV() && key) { const g = document.querySelector(`[data-stop="${key}"],[data-sel="${key}"],[href="${CSS.escape(key)}"]`); if (g) g.focus({ preventScroll: true }); else tvFocus(); }
   } else if (!data) syncPush();
 }
+/* Devices like the Fire TV keep vene open for days: when it comes back after an hour or more, reload to pick up the newest version */
+const LOADED_AT = Date.now();
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - LOADED_AT > 3600000 && !busyNow()) location.reload(); });
+setInterval(() => { if (Date.now() - LOADED_AT > 6 * 3600000 && !busyNow() && route().v === "home") location.reload(); }, 600000);
 if (SYNC.sb) {
   SYNC.sb.auth.getSession().then(({ data }) => { SYNC.user = data.session ? data.session.user : null; if (SYNC.user) { syncPull(); render(); } });
   SYNC.sb.auth.onAuthStateChange((ev, session) => { const was = SYNC.user; SYNC.user = session ? session.user : null; if (ev === "SIGNED_IN" && !was) syncPull(true); });
