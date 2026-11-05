@@ -156,6 +156,12 @@ html.tv [data-addlink],html.tv .linkform,html.tv [data-pastefor],html.tv [data-e
 html.tv .sq{pointer-events:none}
 html.tv h2.sec small{display:none}
 html.tv .lcard{cursor:default}
+.tvonly{display:none!important}
+html.tv .tvonly{display:inline-flex!important}
+html.tv .touchonly{display:none!important}
+html.tv .lrow.moving .lcard{transform:scale(1.02);box-shadow:0 0 0 3px #FFB238,0 24px 50px rgba(0,0,0,.55);background:rgba(40,28,34,.96)}
+html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
+.mvb{font-size:18px;font-weight:800}
 /* phone */
 @media (max-width:760px){
   #app{padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px))}
@@ -179,7 +185,7 @@ html.tv .lcard{cursor:default}
 <main id="app"></main>
 <div id="sheet" hidden><div class="box" id="sheetbox"></div></div>
 <div id="toast" role="status" hidden></div>
-<script>if (/veneTV/.test(navigator.userAgent) || /[?&]tv=1/.test(location.search)) document.documentElement.classList.add("tv");</script>
+<script>if (/veneTV/.test(navigator.userAgent) || /[?&]tv=1/.test(location.search)) { document.documentElement.classList.add("tv"); document.querySelector('meta[name=viewport]').content = "width=1600"; }</script>
 <script src="vene-data.js"></script>
 <script>
 "use strict";
@@ -422,12 +428,12 @@ function playlistPage(id) {
   let h = header();
   h += `<div class="plwrap"><aside>${coverHTML(p, 290)}<div class="pinfo"><h1 class="disp" style="margin:6px 0 0;font-size:44px;line-height:.95;font-weight:800;letter-spacing:-.035em">${esc(p.name)}</h1><span style="display:flex;align-items:center;gap:10px"><span class="dots">${svcDots(p)}</span><span style="color:var(--soft)">${items.length} titles · about ${fmtMin(mins)}</span></span>
     <div style="display:flex;gap:10px;flex-wrap:wrap">${items.length ? `${keepLink(p, 'class="btnp"', `<i>${svgPlay(14, "#FFB238")}</i>${done >= 0 ? "Keep watching" : "Play from the top"}`)}<button class="btng warm" data-pickfor="${p.id}">${svgDie(19)}Pick for me</button>` : ""}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="chip${edit ? " on" : ""}" data-edit="${p.id}">${edit ? "Done" : "Edit"}</button><span class="mute" style="font-size:12px;align-self:center;flex-basis:100%">Press and hold a title to move it.</span><button class="chip" data-rename="${p.id}">Rename</button>${done >= 0 ? `<button class="chip" data-reset="${p.id}">Start over</button>` : ""}${edit ? `<button class="chip" data-delpl="${p.id}">Delete playlist</button>` : ""}</div></div></aside>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="chip${edit ? " on" : ""}" data-edit="${p.id}">${edit ? "Done" : "Edit"}</button><span class="mute touchonly" style="font-size:12px;align-self:center;flex-basis:100%">Press and hold a title to move it.</span><span class="mute tvonly" style="font-size:14px;align-self:center;flex-basis:100%">${tvMove && tvMove.pid === p.id ? "Use up and down to move it. Press select when it's in place." : "To change the order, select ⇅ next to a title."}</span><button class="chip" data-rename="${p.id}">Rename</button>${done >= 0 ? `<button class="chip" data-reset="${p.id}">Start over</button>` : ""}${edit ? `<button class="chip" data-delpl="${p.id}">Delete playlist</button>` : ""}</div></div></aside>
     <ol class="lineup" style="flex:1;min-width:0;margin-top:8px;width:100%">${items.length > 1 ? `<div class="vl" style="background:linear-gradient(180deg,#FFB238 0%,#FFB238 ${Math.max(0, (done + .5) / (items.length - 1) * 100)}%,rgba(246,237,227,.28) ${Math.max(0, (done + .5) / (items.length - 1) * 100) + 5}%,rgba(246,237,227,.28) 100%)"></div>` : ""}` +
     items.map((it, j) => { const t = target(it), c = svcColor(t), on = j === sel, sv = SVC[t.svc] || SVC[t.n] || { t: "", f: "#fff" };
-      return `<li class="lrow" data-row="${p.id}|${j}" style="opacity:${j <= done && !on ? .55 : 1}"><span class="nodewrap"><span class="node" style="${on ? `width:34px;height:34px;background:${c};color:${sv.f};box-shadow:0 0 0 5px rgba(255,178,56,.35)` : `width:16px;height:16px;background:${c}`}">${on ? esc(sv.t) : ""}</span></span>
+      return `<li class="lrow${tvMove && tvMove.pid === p.id && tvMove.j === j ? " moving" : ""}" data-row="${p.id}|${j}" style="opacity:${j <= done && !on ? .55 : 1}"><span class="nodewrap"><span class="node" style="${on ? `width:34px;height:34px;background:${c};color:${sv.f};box-shadow:0 0 0 5px rgba(255,178,56,.35)` : `width:16px;height:16px;background:${c}`}">${on ? esc(sv.t) : ""}</span></span>
       <button class="lcard${on ? " on" : ""}" data-sel="${p.id}|${j}"><span class="th" style="${bgUrl(art(it, true))}"></span><span class="ltxt"><span class="tag" style="color:${j === next ? "#FFB238" : "#7E6F70"}">${j <= done ? "Watched" : j === next ? "Up next" : "&nbsp;"}</span><b>${esc(it.title)}</b><span style="font-size:13px;color:${t.check ? "#FFCB7A" : "var(--mute)"}">${esc(it.kind === "episode" ? showOf(it).title + " · " + se(it) + " · " : it.kind === "movie" ? "Movie · " : "")}${esc(playLabel(t))}</span></span><span class="mute" style="font-size:13px">${esc(fmtMin(it.min))}</span></button>
-      ${edit ? `<span class="ed"><button class="ib" data-rm="${p.id}|${j}" aria-label="Remove ${esc(it.title)}">✕</button></span>` : `<a class="ib play" href="${esc(t.u)}" data-mark="${p.id}|${j}"${t.copy ? ` data-copy="${esc(t.copy)}"` : ""} aria-label="Play ${esc(it.title)}">${svgPlay(14, "#FFB238")}</a>`}</li>`; }).join("") +
+      ${edit ? `<span class="ed"><button class="ib" data-rm="${p.id}|${j}" aria-label="Remove ${esc(it.title)}">✕</button></span>` : `<a class="ib play" href="${esc(t.u)}" data-mark="${p.id}|${j}"${t.copy ? ` data-copy="${esc(t.copy)}"` : ""} aria-label="Play ${esc(it.title)}">${svgPlay(14, "#FFB238")}</a><button class="ib mvb tvonly" data-tvmove="${p.id}|${j}" aria-label="Move ${esc(it.title)}">⇅</button>`}</li>`; }).join("") +
     `<li class="lrow"><span class="nodewrap"><span class="node" style="width:28px;height:28px;border:2px dashed rgba(255,178,56,.55);background:transparent;color:var(--amber)">+</span></span><a class="lcard" href="#browse" style="justify-content:center;border-style:dashed;border-color:rgba(255,178,56,.35);color:var(--amber);font-weight:700;text-decoration:none">Add a movie or episode to the night</a></li></ol></div>`;
   $("app").innerHTML = h;
 }
@@ -560,6 +566,54 @@ document.addEventListener("contextmenu", e => { if (e.target.closest(".lrow[data
 function rail(v) {
   $("rail").innerHTML = NAV.map(([k, label, path]) => `<a class="navb${(v === k || (k === "playlists" && v === "pl") || (k === "browse" && v === "t")) ? " on" : ""}" href="#${k}" aria-label="${label}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${path}</svg><span>${label}</span></a>`).join("");
 }
+/* ---------- TV remote: arrows move to the nearest thing in that direction ---------- */
+let tvMove = null;
+const isTV = () => document.documentElement.classList.contains("tv");
+function focusables() {
+  const box = $("sheet").hidden ? document : $("sheet");
+  return [...box.querySelectorAll('a[href],button,input,[tabindex]:not([tabindex="-1"])')].filter(el => { if (el.tabIndex < 0 || el.disabled) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden"; });
+}
+function tvStep(dir) {
+  const cur = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+  const all = focusables(); if (!all.length) return;
+  if (!cur || !all.includes(cur)) { all[0].focus(); return; }
+  const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  let best = null, bestS = Infinity;
+  for (const el of all) {
+    if (el === cur || cur.contains(el) || el.contains(cur)) continue;
+    const b = el.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2;
+    let main, side;
+    if (dir === "right") { if (b.left < a.right - 4 && bx <= ax + 4) continue; main = Math.max(0, b.left - a.right); side = Math.max(0, Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom)) ? Math.abs(by - ay) : 0; }
+    else if (dir === "left") { if (b.right > a.left + 4 && bx >= ax - 4) continue; main = Math.max(0, a.left - b.right); side = Math.max(a.top, b.top) - Math.min(a.bottom, b.bottom) > 0 ? Math.abs(by - ay) : 0; }
+    else if (dir === "down") { if (b.top < a.bottom - 4 && by <= ay + 4) continue; main = Math.max(0, b.top - a.bottom); side = Math.max(a.left, b.left) - Math.min(a.right, b.right) > 0 ? Math.abs(bx - ax) : 0; }
+    else { if (b.bottom > a.top + 4 && by >= ay - 4) continue; main = Math.max(0, a.top - b.bottom); side = Math.max(a.left, b.left) - Math.min(a.right, b.right) > 0 ? Math.abs(bx - ax) : 0; }
+    const s = main + side * 2.5;
+    if (s < bestS) { bestS = s; best = el; }
+  }
+  if (best) best.focus(); else if (dir === "up") window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function tvMoveStep(k) {
+  const p = plOf(tvMove.pid), i = tvMove.j, n = i + k; if (n < 0 || n >= p.items.length) return;
+  const playedId = ST.played[p.id] != null ? p.items[ST.played[p.id]] : null;
+  [p.items[i], p.items[n]] = [p.items[n], p.items[i]];
+  if (playedId) ST.played[p.id] = p.items.indexOf(playedId);
+  tvMove.j = n; threadSel[p.id] = n; save(); render();
+  const b = document.querySelector(`[data-tvmove="${p.id}|${n}"]`); if (b) b.focus();
+}
+document.addEventListener("keydown", e => {
+  if (!isTV()) return;
+  const dir = { ArrowRight: "right", ArrowLeft: "left", ArrowDown: "down", ArrowUp: "up" }[e.key];
+  if (tvMove) {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") { e.preventDefault(); tvMoveStep(e.key === "ArrowUp" ? -1 : 1); return; }
+    if (e.key === "Enter" || e.key === "Escape" || e.key === "Backspace" || e.key === "GoBack") { e.preventDefault(); const p = plOf(tvMove.pid), id = p.items[tvMove.j]; tvMove = null; render(); toast("Moved " + BY[id].title); const b = document.querySelector(`[data-tvmove="${p.id}|${p.items.indexOf(id)}"]`); if (b) b.focus(); return; }
+    if (dir) { e.preventDefault(); return; }
+  }
+  if (!dir) return;
+  const t = e.target;
+  if (t && t.tagName === "INPUT" && (dir === "left" || dir === "right") && t.value) return;
+  e.preventDefault(); tvStep(dir);
+});
+window.veneBack = () => { if (tvMove) { document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); return true; } if (!$("sheet").hidden) { closeSheet(); return true; } return false; };
 function tvFocus() { if (!document.documentElement.classList.contains("tv")) return; if (route().v === "home") return; const f = document.querySelector("#app .btnp, #app .lcard, #app a.pa, #app .chip"); if (f) f.focus(); }
 function render() {
   const { v, arg } = route();
@@ -571,7 +625,7 @@ window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); t
 window.addEventListener("resize", () => { if (route().v === "home") placeSquares(); });
 let qT;
 document.addEventListener("input", e => { if (e.target.id === "q") { clearTimeout(qT); const v = e.target.value; qT = setTimeout(() => { history.replaceState(null, "", "#search:" + encodeURIComponent(v)); render(); }, 250); } });
-document.addEventListener("focusin", e => { if (document.documentElement.classList.contains("tv") && e.target.scrollIntoView) e.target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); });
+document.addEventListener("focusin", e => { if (!isTV() || !e.target.scrollIntoView || e.target.closest("#rail")) return; const r = e.target.getBoundingClientRect(); if (r.top < 90 || r.bottom > innerHeight - 40) e.target.scrollIntoView({ block: r.height > innerHeight * .6 ? "start" : "center", inline: "nearest", behavior: "smooth" }); else e.target.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" }); });
 document.addEventListener("submit", e => {
   if (e.target.classList.contains("pickform")) { e.preventDefault(); const u = extractUrl(e.target.elements.u.value); if (u && hostSvc(u)) go("link:" + encodeURIComponent(u)); else toast("That doesn't look like a streaming app's link"); return; }
   if (e.target.classList.contains("linkform")) { e.preventDefault(); const u = extractUrl(e.target.elements.u.value); if (!u || !hostSvc(u)) { toast("That doesn't look like a streaming app's Share link"); return; } ST.links[e.target.dataset.id] = u; save(); toast("Saved. Play opens this exact episode"); return render(); }
@@ -600,6 +654,7 @@ document.addEventListener("click", e => {
   if (d.pickfor) { const p = plOf(d.pickfor); const it = BY[p.items[Math.floor(Math.random() * p.items.length)]]; toast("How about " + it.title + "?"); threadSel[p.id] = p.items.indexOf(it.id); return render(); }
   if (d.stop) { const [pid, j] = d.stop.split("|"); if (threadSel[pid] === +j || document.documentElement.classList.contains("tv")) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
   if (d.sel) { const [pid, j] = d.sel.split("|"); if (threadSel[pid] === +j) return go("t:" + plOf(pid).items[+j]); threadSel[pid] = +j; return render(); }
+  if (d.tvmove) { const [pid, j] = d.tvmove.split("|"); tvMove = { pid, j: +j }; render(); const b = document.querySelector(`[data-tvmove="${pid}|${j}"]`); if (b) b.focus(); return; }
   if (d.mv) { const [pid, j, dir] = d.mv.split("|"); const p = plOf(pid), i = +j, k = i + +dir; if (k < 0 || k >= p.items.length) return; [p.items[i], p.items[k]] = [p.items[k], p.items[i]]; threadSel[pid] = k; save(); return render(); }
   if (d.rm) { const [pid, j] = d.rm.split("|"); const p = plOf(pid); const t = BY[p.items[+j]]; p.items.splice(+j, 1); if (ST.played[pid] >= +j) ST.played[pid]--; delete threadSel[pid]; save(); toast("Removed " + t.title); return render(); }
   if (d.edit) { editPl[d.edit] = !editPl[d.edit]; return render(); }
