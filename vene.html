@@ -220,6 +220,8 @@ const KEY = "vene.v1";
 const ST = { sv: ["Netflix", "Hulu", "Disney+", "Prime Video", "YouTube", "Tubi", "Pluto TV"], via: {}, own: {}, lib: [], pls: null, played: {}, recent: null, pid: 1, links: {} };
 try { Object.assign(ST, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
 if (!ST.links) ST.links = {};
+if (!ST.items || typeof ST.items !== "object") ST.items = {};
+Object.values(ST.items).forEach(it => { if (it && it.id && !BY[it.id]) BY[it.id] = it; });
 if (!Array.isArray(ST.pls)) ST.pls = D.playlists.map(p => ({ id: p.id, name: p.name, items: p.items.slice() }));
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(ST)); } catch (e) {} try { syncPush(); } catch (e) {} };
 const newId = () => "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); // unique across devices
@@ -361,7 +363,7 @@ const inAnyPl = id => ST.pls.some(p => p.items.includes(id));
 const ICON_ADD = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="4.5" cy="9" r="2"/><circle cx="14.5" cy="9" r="2"/><path d="M6.5 9h6"/><path d="M19 13v7M15.5 16.5h7"/></svg>';
 const ICON_IN = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="4.5" cy="9" r="2" fill="currentColor"/><circle cx="14.5" cy="9" r="2" fill="currentColor"/><path d="M6.5 9h6"/><path d="M15.5 17l2.3 2.3 4.2-4.6"/></svg>';
 const addBtn = it => it.kind === "series" ? "" : `<button class="addb${inAnyPl(it.id) ? " in" : ""}" data-add="${it.id}" aria-label="${inAnyPl(it.id) ? "In a playlist. Add " + esc(it.title) + " to another" : "Add " + esc(it.title) + " to a playlist"}">${inAnyPl(it.id) ? ICON_IN : ICON_ADD}</button>`;
-function posterCard(it) { const t = target(it), ep = it.kind === "episode"; return `<div class="poster${ep ? " ep" : ""}"><a class="pa" href="#t:${it.id}" style="gap:0"><span class="img${ep ? " ep" : ""}" style="${bgUrl(art(it, ep))}"><span class="svcdot" style="background:${svcColor(t)}"></span></span></a><span class="pcap"><a class="pa" href="#t:${it.id}" style="gap:1px"><b>${esc(it.title)}</b><span class="mute" style="font-size:12px">${esc(ep ? showOf(it).title + " · " + se(it) : (it.kind === "series" ? "Series" : it.year || ""))} · ${esc(t.n)}</span></a>${addBtn(it)}</span></div>`; }
+function posterCard(it) { const lite = String(it.id).startsWith("tm:") && !it.full && it.kind !== "episode" && !it.src, t = lite ? { n: "", svc: "" } : target(it), ep = it.kind === "episode"; return `<div class="poster${ep ? " ep" : ""}"><a class="pa" href="#t:${it.id}" style="gap:0"><span class="img${ep ? " ep" : ""}" style="${bgUrl(art(it, ep))}"><span class="svcdot" style="background:${svcColor(t)}"></span></span></a><span class="pcap"><a class="pa" href="#t:${it.id}" style="gap:1px"><b>${esc(it.title)}</b><span class="mute" style="font-size:12px">${esc(ep ? showOf(it).title + " · " + se(it) : (it.kind === "series" ? "Series" : it.year || ""))}${lite ? "" : " · " + esc(t.n)}</span></a>${addBtn(it)}</span></div>`; }
 function home() {
   const { th, four } = heroFour();
   const cont = plOf(ST.recent) || ST.pls.find(p => p.items.some(id => (BY[id] && BY[id].themes || []).includes(th))) || ST.pls[0];
@@ -370,35 +372,43 @@ function home() {
   h += `<div class="pips">${four.map((it, j) => `<button class="pip" data-hero="${j}" aria-label="Show ${esc(it.title)}"></button>`).join("")}</div>`;
   if (cont && cont.items.length) h += `<h2 class="sec">Continue ${esc(cont.name)} <small>tap a stop to see where it plays</small>${keepLink(cont, 'class="btng warm" style="height:40px;margin-left:auto;font-size:14px"', svgPlay(13, "#FFB238") + " Keep watching")}</h2>${threadHTML(cont)}`;
   h += `<h2 class="sec">Your playlists <small>${ST.pls.length}</small></h2><div class="row">${ST.pls.map(plCard).join("")}<button class="pl" data-newpl="1"><span style="display:grid;place-items:center;width:180px;height:180px;border-radius:18px;border:1.5px dashed rgba(255,178,56,.45);color:var(--amber)">${svgPlus(30)}</span><b class="disp" style="font-size:16px;color:var(--amber-hi)">New playlist</b></button></div>`;
+  h += `<div id="fresh"></div>`;
   [th].concat(THEMES.filter(x => x !== th)).forEach(t => {
     const list = D.items.filter(x => x.kind !== "series" && (x.themes || []).includes(t));
     if (list.length) h += `<h2 class="sec">${esc(t)} <small>${list.length} titles</small></h2><div class="row">${list.map(posterCard).join("")}</div>`;
   });
-  h += `<p class="credit">Starter catalog of hand-picked titles. Search of the full catalog and "Fresh this week" arrive with vene's online service. Titles, episode details and artwork: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Where to watch: <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>, checked ${esc(checkedOn())}.</p>`;
+  h += `<p class="credit">Titles, episode details and artwork: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Where to watch: <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>, checked ${esc(checkedOn())}.</p>`;
   $("app").innerHTML = h;
-  heroText(four, th); placeSquares(); heroLoop(four, th);
+  heroText(four, th); placeSquares(); heroLoop(four, th); fillFresh();
   if (document.documentElement.classList.contains("tv")) { document.querySelectorAll(".sq").forEach(x => x.tabIndex = -1); const f = document.querySelector("#herotext .btnp"); if (f && !document.activeElement.closest?.("#app")) f.focus(); }
   window.__four = { four, th };
 }
 
 /* ---------- title page ---------- */
 function titlePage(id) {
-  const it = BY[id]; if (!it) return home();
+  const it = BY[id] || idFromRoute(id); if (!it) return home();
+  const sh0 = showOf(it);
+  if (String(id).startsWith("tm:")) keepItem(id);
+  if (sh0 && sh0.tmdb && !sh0.full && !(CUR[(sh0.kind === "movie" ? "m" : "s") + sh0.tmdb] && (sh0.kind === "movie" || sh0.seasons))) {
+    needFull(sh0).then(r => { if (route().v === "t" && route().arg === id) { const y = scrollY; render(); scrollTo(0, y); if (r && r.error && $("wtw")) $("wtw").insertAdjacentHTML("beforeend", `<p class="mute" style="margin:6px 0">${netMsg(r.error)}</p>`); } });
+  }
   const base = showOf(it), t = target(it), ep = it.kind === "episode", ser = it.kind === "series";
   document.body.style.removeProperty("--bg");
   if (ep || ser) { ST.lastShow = base.id; save(); }
   let h = header();
-  const meta = ep ? `${base.title} · Season ${it.s} · Episode ${it.e} · ${fmtMin(it.min)}` : ser ? `Series · ${EPS(it.id).length} episodes in vene` : [it.year, fmtMin(it.min)].filter(Boolean).join(" · ");
+  const meta = ep ? `${base.title} · Season ${it.s} · Episode ${it.e}${it.min ? " · " + fmtMin(it.min) : ""}` : ser ? [it.year, it.seasons ? it.seasons.length + (it.seasons.length === 1 ? " season" : " seasons") : `${EPS(it.id).length} episodes in vene`].filter(Boolean).join(" · ") : [it.year, fmtMin(it.min)].filter(Boolean).join(" · ");
+  const waiting = String(base.id).startsWith("tm:") && !base.full;
   h += `<section class="titlehead" style="display:flex;gap:34px;align-items:flex-start;margin-top:8px"><span style="width:${ep ? 320 : 206}px;max-width:100%;aspect-ratio:${ep ? "16/9" : "2/3"};flex:none;border-radius:20px;background:#2A1C24 center/cover;${bgUrl(art(it, ep))};box-shadow:0 34px 70px rgba(0,0,0,.6)" id="tposter"></span>
     <div style="display:flex;flex-direction:column;gap:12px;min-width:0"><span style="font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--amber)">${esc(ep ? "Episode" : ser ? "Series" : "Film")}${(it.themes || []).length ? " · " + esc(it.themes.join(" · ")) : ""}</span>
     <h1 class="disp" style="margin:0;font-size:clamp(36px,5vw,60px);line-height:.95;font-weight:800;letter-spacing:-.035em">${esc(it.title)}</h1><span style="color:var(--soft)">${esc(meta)}</span>
     ${it.ov || base.ov ? `<p style="margin:0;max-width:640px;color:#DCCDC6;line-height:1.55">${esc(it.ov || base.ov)}</p>` : ""}
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">${ser ? "" : `<a class="btnp" href="${esc(t.u)}"${t.copy ? ` data-copy="${esc(t.copy)}"` : ""}><i>${svgPlay(14, "#FFB238")}</i>${esc(playLabel(t))}</a>`}
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">${ser || waiting ? "" : `<a class="btnp" href="${esc(t.u)}"${t.copy ? ` data-copy="${esc(t.copy)}"` : ""}><i>${svgPlay(14, "#FFB238")}</i>${esc(playLabel(t))}</a>`}
     ${base.trailer ? `<button class="btng warm" data-trailer="${esc(base.trailer)}">Trailer</button>` : ""}${ser ? "" : `<button class="btng warm" data-add="${it.id}">${svgPlus(18)}Playlist</button>`}<button class="btng warm" data-save="${it.id}" aria-label="Save to Library" style="padding:0 15px">${svgHeart(18, ST.lib.includes(it.id))}</button></div></div></section><div id="trailerbox"></div>`;
   // where to watch
   const srcs = srcOf(it), chosen = t;
-  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:28px"><section class="panel warm"><div style="display:flex;justify-content:space-between"><h2 class="h3">Where to watch</h2><span class="mute" style="font-size:12px">Checked ${esc(checkedOn())}</span></div>`;
-  if (!srcs.length && !Object.keys(base.buy || {}).length) h += `<p class="mute" style="margin:6px 0">Not on any service vene tracks right now.</p>`;
+  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:28px"><section class="panel warm" id="wtw"><div style="display:flex;justify-content:space-between"><h2 class="h3">Where to watch</h2><span class="mute" style="font-size:12px">${waiting ? "Checking…" : "Checked " + esc(base.checked ? new Date(base.checked + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" }) : checkedOn())}</span></div>`;
+  if (waiting) h += `<p class="mute" style="margin:6px 0">Checking where this streams…</p>`;
+  else if (!srcs.length && !Object.keys(base.buy || {}).length) h += `<p class="mute" style="margin:6px 0">Not on any service vene tracks right now.</p>`;
   srcs.forEach(s => { const sv = SVC[s.svc] || { t: "", c: "#9C8C8A", f: "#fff" }, isPick = !chosen.owned && chosen.svc === s.svc && (chosen.n.includes(s.via || s.svc));
     const rowU = BROKEN(s) && s.svc === "Paramount+" ? "https://www.paramountplus.com/" : ep && !ST.links[it.id] ? (SVC[s.via || s.svc] && SVC[s.via || s.svc].q ? SVC[s.via || s.svc].q + encodeURIComponent(base.title) : s.u) : s.u;
     h += `<a href="${esc(rowU)}" style="text-decoration:none;display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:14px;${isPick ? "background:rgba(255,178,56,.10);border:1px solid rgba(255,178,56,.3)" : ""}">${isPick ? `<span style="width:28px;height:28px;border-radius:999px;background:${sv.c};color:${sv.f};font:800 10px var(--body);display:grid;place-items:center;box-shadow:0 0 0 3px rgba(255,178,56,.35)">${esc(sv.t)}</span>` : `<span style="width:12px;height:12px;margin:0 8px;border-radius:999px;background:${sv.c}"></span>`}<span style="flex:1;display:flex;flex-direction:column"><b style="font-weight:${isPick ? 700 : 500}">${esc(s.svc)}${s.via ? `, inside ${esc(s.via)}` : ""}</b>${isPick ? `<span style="font-size:12px;color:var(--amber-hi)">${chosen.mine ? "Yours · " : ""}${ep ? "opens a search for the show" : "opens here"}</span>` : ""}</span><span class="mute" style="font-size:12px">${BROKEN(s) && s.svc === "Paramount+" ? "Opens the app; search there" : s.free ? "Free · tap to open" : ST.sv.includes(s.svc) ? "In My Services" : "Tap to open"}</span></a>`; });
@@ -410,11 +420,14 @@ function titlePage(id) {
   const inPls = ST.pls.filter(p => p.items.includes(it.id));
   if (!ser) h += `<section class="panel warm"><h2 class="h3">In your playlists</h2>${inPls.length ? inPls.map(p => `<a href="#pl:${esc(p.id)}" style="display:flex;align-items:center;gap:12px;text-decoration:none;margin-bottom:10px">${coverHTML(p, 56)}<span style="display:flex;flex-direction:column"><b class="disp">${esc(p.name)}</b><span class="mute" style="font-size:12px">Number ${p.items.indexOf(it.id) + 1} in the lineup</span></span></a>`).join("") : `<p class="mute" style="margin:0 0 10px">Not in a playlist yet.</p>`}<button class="chip" data-add="${it.id}">${svgPlus(14)} Add to a playlist</button></section>`;
   h += `</div>`;
-  if (ser || ep) {
-    const sh = ser ? it : base, eps = EPS(sh.id);
-    h += `<h2 class="sec">Episodes in vene <small>${esc(sh.title)}</small></h2><div class="row">${eps.map(posterCard).join("")}</div>`;
+  const shw = ser ? it : base;
+  if ((ser || ep) && shw.seasons && shw.seasons.length) h += seasonsHTML(shw, ep ? it.s : null);
+  else if (ser || ep) {
+    const eps = EPS(shw.id);
+    if (eps.length) h += `<h2 class="sec">Episodes in vene <small>${esc(shw.title)}</small></h2><div class="row">${eps.map(posterCard).join("")}</div>`;
   }
   $("app").innerHTML = h;
+  if ($("eplist")) { const [sid, sn] = $("eplist").dataset.for.split("|"); fillSeason(BY[sid], +sn); }
 }
 
 /* ---------- playlist page ---------- */
@@ -468,7 +481,15 @@ function searchPage(q) {
   document.body.style.removeProperty("--bg");
   const n = q.trim().toLowerCase();
   const res = n ? D.items.filter(x => (x.title + " " + (x.kind === "episode" ? showOf(x).title : "") + " " + (x.themes || []).join(" ")).toLowerCase().includes(n)) : [];
-  $("app").innerHTML = header() + `<h1 class="disp" style="margin:6px 0 6px;font-size:36px;font-weight:800">Search</h1><p class="mute" style="margin:0 0 18px">Searching vene's starter catalog. Searching every movie and show arrives with vene's online service.</p>${n ? (res.length ? `<div class="grid">${res.map(posterCard).join("")}</div>` : `<div class="empty">Nothing in the starter catalog matches "${esc(q)}" yet.</div>`) : ""}`;
+  const mine = n ? Object.values(ST.items).filter(x => x.kind !== "episode" && String(x.title).toLowerCase().includes(n) && !res.some(r => r.id === x.id)).map(x => BY[x.id] || x) : [];
+  const local = res.concat(mine);
+  $("app").innerHTML = header() + `<h1 class="disp" style="margin:6px 0 16px;font-size:36px;font-weight:800">Search</h1>${n ? `${local.length ? `<h2 class="sec">In vene</h2><div class="grid" style="margin-bottom:26px">${local.map(posterCard).join("")}</div>` : ""}<div id="netres" data-q="${esc(q)}"><h2 class="sec">Everything</h2><div class="empty">Searching every movie and show…</div></div>` : `<p class="mute">Type a movie, show or episode.</p>`}`;
+  if (n) net("search", { q: q.trim() }).then(r => {
+    const box = $("netres"); if (!box || box.dataset.q !== q) return;
+    const have = new Set(local.map(x => x.id));
+    const list = (r.results || []).map(fromNet).filter(x => !have.has(x.id));
+    box.innerHTML = `<h2 class="sec">Everything <small>${r.error ? "" : list.length + " results"}</small></h2>` + (r.error ? `<div class="empty">${netMsg(r.error)}</div>` : list.length ? `<div class="grid">${list.map(posterCard).join("")}</div>` : `<div class="empty">Nothing found for "${esc(q)}".</div>`);
+  });
   const i = $("q"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
 }
 
@@ -498,7 +519,7 @@ const epRow = (e, u) => `<button class="lcard" data-linkto="${e.id}" data-u="${e
 /* ---------- my services ---------- */
 /* ---------- account + sync (Supabase: email code sign-in, each person's row locked to them) ---------- */
 const SB_URL = "https://sqfzaeysifhhnlhbngfx.supabase.co", SB_KEY = "sb_publishable_V5Z7RmGmbNizJn5aQyik6g_VetzDUyr";
-const SYNC_KEYS = ["name", "sv", "via", "own", "lib", "pls", "played", "recent", "links", "lastShow"];
+const SYNC_KEYS = ["name", "sv", "via", "own", "lib", "pls", "played", "recent", "links", "lastShow", "items"];
 const SYNC = { sb: null, user: null, at: null, err: "", step: null, email: "", busy: false, pushT: null, remoteAt: null };
 try { if (window.supabase) SYNC.sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: "vene.auth" } }); } catch (e) {}
 try { SYNC.remoteAt = localStorage.getItem("vene.syncAt"); } catch (e) {}
@@ -518,13 +539,14 @@ function mergeFirst(remote) { // first sign-in on this device: keep what's here 
   const ids = new Set((r.pls || []).map(p => p.id));
   out.pls = (r.pls || []).concat((ST.pls || []).filter(p => !ids.has(p.id)));
   out.lib = [...new Set([...(r.lib || []), ...(ST.lib || [])])];
-  out.links = Object.assign({}, ST.links, r.links); out.own = Object.assign({}, ST.own, r.own);
+  out.links = Object.assign({}, ST.links, r.links); out.own = Object.assign({}, ST.own, r.own); out.items = Object.assign({}, ST.items, r.items);
   out.name = r.name || ST.name;
   return out;
 }
 function applyRemote(d) {
   SYNC.applying = true; SYNC_KEYS.forEach(k => { if (d[k] !== undefined) ST[k] = d[k]; });
-  if (!Array.isArray(ST.pls)) ST.pls = []; if (!ST.links) ST.links = {};
+  if (!Array.isArray(ST.pls)) ST.pls = []; if (!ST.links) ST.links = {}; if (!ST.items) ST.items = {};
+  Object.values(ST.items).forEach(it => { if (it && it.id) BY[it.id] = Object.assign(BY[it.id] || {}, it); });
   save(); SYNC.applying = false;
 }
 const busyNow = () => tvMove || drag || !$("sheet").hidden || (document.activeElement && document.activeElement.tagName === "INPUT");
@@ -593,6 +615,85 @@ async function checkCode() {
   SYNC.user = data.user; SYNC.step = null; toast("Signed in. Syncing your playlists");
   await syncPull(true);
 }
+/* ---------- online service: search everything, seasons, where to watch, fresh this week ---------- */
+const NETC = {}; // answers this session
+async function net(action, body) {
+  if (!SYNC.sb || !SYNC.user) return { error: "signin" };
+  const key = action + JSON.stringify(body || {}); if (NETC[key] && Date.now() - NETC[key].at < 1800000) return NETC[key].data;
+  try {
+    const { data: { session } } = await SYNC.sb.auth.getSession(); if (!session) return { error: "signin" };
+    const r = await fetch(SB_URL + "/functions/v1/vene", { method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY, Authorization: "Bearer " + session.access_token }, body: JSON.stringify(Object.assign({ action }, body)) });
+    const data = await r.json().catch(() => ({ error: "upstream" }));
+    if (!data.error) NETC[key] = { at: Date.now(), data };
+    return data;
+  } catch (e) { return { error: "offline" }; }
+}
+const netMsg = e => e === "signin" ? `<a href="#services">Sign in</a> to search every movie and show.` : e === "not_allowed" ? "Your email isn't on the vene family list yet." : e === "missing_keys" ? "vene's online service is missing its TMDB or Watchmode key." : "Couldn't reach vene's online service just now.";
+const CUR = {}; D.items.forEach(x => { if (x.tmdb) CUR[(x.kind === "movie" ? "m" : "s") + x.tmdb] = x.id; });
+D.items.forEach(x => { if (x.kind === "episode" && BY[x.series] && BY[x.series].tmdb) CUR["e" + BY[x.series].tmdb + ":" + x.s + ":" + x.e] = x.id; });
+function fromNet(x) { // TMDB answer -> a vene item (the starter catalog's own copy when it has one)
+  const k = (x.kind === "movie" ? "m" : "s") + x.tmdb, id = CUR[k] || "tm:" + k;
+  const it = BY[id] || (BY[id] = { id, themes: [] });
+  if (!CUR[k]) Object.assign(it, x, { id, themes: it.themes || [] });
+  else if (x.seasons) it.seasons = x.seasons;
+  if (x.src && !CUR[k]) it.full = true;
+  return it;
+}
+function epFromNet(series, x) {
+  const k = "e" + series.tmdb + ":" + x.s + ":" + x.e, id = CUR[k] || "tm:" + k;
+  if (CUR[k]) return BY[id];
+  return BY[id] = Object.assign(BY[id] || {}, x, { id, kind: "episode", series: series.id, themes: [] });
+}
+function keepItem(id) { // remember online titles that are saved, playlisted or opened, so every device knows them
+  const it = BY[id]; if (!it || !String(id).startsWith("tm:")) return;
+  if (it.kind === "episode") keepItem(it.series);
+  const o = Object.assign({}, it); delete o.full;
+  delete ST.items[id]; ST.items[id] = o;
+  const ks = Object.keys(ST.items), used = new Set([...ST.lib, ...ST.pls.flatMap(p => p.items), ...Object.keys(ST.links)]);
+  ST.pls.forEach(p => p.items.forEach(i => { const e = BY[i]; if (e && e.series) used.add(e.series); }));
+  for (let i = 0; ks.length - i > 250 && i < ks.length; i++) if (!used.has(ks[i])) delete ST.items[ks[i]];
+}
+async function needFull(it) { // where to watch + details for an online title (or seasons for a starter show)
+  if (!it || !it.tmdb || it.kind === "episode") return;
+  if (it.full || (CUR[(it.kind === "movie" ? "m" : "s") + it.tmdb] && (it.kind === "movie" || it.seasons))) return;
+  const r = await net("title", { kind: it.kind, id: it.tmdb });
+  if (r.title) { fromNet(r.title); if (it.id.startsWith("tm:")) { it.full = true; keepItem(it.id); save(); } }
+  return r;
+}
+const seasonSel = {};
+async function loadSeason(sh, sn) {
+  const r = await net("season", { id: sh.tmdb, s: sn });
+  return r.episodes ? r.episodes.map(x => epFromNet(sh, x)) : null;
+}
+function seasonsHTML(sh, cur) {
+  if (!sh.seasons || !sh.seasons.length) return "";
+  const sn = seasonSel[sh.id] || cur || sh.seasons[0].s;
+  return `<h2 class="sec">Episodes <small>${esc(sh.title)}</small></h2><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">${sh.seasons.map(x => `<button class="chip${x.s === sn ? " on" : ""}" data-season="${sh.id}|${x.s}">Season ${x.s}</button>`).join("")}</div><div id="eplist" class="grid" data-for="${sh.id}|${sn}"><div class="empty">Loading season ${sn}…</div></div>`;
+}
+async function fillSeason(sh, sn) {
+  const box = $("eplist"); if (!box) return;
+  const eps = await loadSeason(sh, sn), b = $("eplist");
+  if (!b || b.dataset.for !== sh.id + "|" + sn) return;
+  b.innerHTML = eps ? eps.map(posterCard).join("") || `<div class="empty">No episodes listed.</div>` : `<div class="empty">${netMsg("upstream")}</div>`;
+}
+let freshCache = null;
+async function fillFresh() {
+  const box = $("fresh"); if (!box) return;
+  if (!SYNC.user) { box.innerHTML = ""; return; }
+  const svcs = ST.sv.filter(n => n !== "YouTube" && n !== "Plex");
+  const r = freshCache && freshCache.key === svcs.join() ? freshCache.r : await net("fresh", { svcs });
+  if (r.fresh) freshCache = { key: svcs.join(), r };
+  const b = $("fresh"); if (!b) return;
+  if (!r.fresh) { b.innerHTML = ""; return; }
+  const seen = new Set(), cards = [];
+  for (let i = 0; i < 8; i++) r.fresh.forEach(list => { const x = list[i]; if (x && !seen.has(x.tmdb)) { seen.add(x.tmdb); const it = fromNet(x); cards.push(freshCard(it, x)); } });
+  b.innerHTML = cards.length ? `<h2 class="sec">Fresh this week <small>from the services you use</small></h2><div class="row">${cards.slice(0, 24).join("")}</div>` : "";
+}
+const freshCard = (it, x) => `<div class="poster"><a class="pa" href="#t:${esc(it.id)}" style="gap:0"><span class="img" style="${bgUrl(it.img)}"><span class="svcdot" style="background:${(SVC[x.svc] || { c: "#9C8C8A" }).c}"></span></span></a><span class="pcap"><a class="pa" href="#t:${esc(it.id)}" style="gap:1px"><b>${esc(it.title)}</b><span class="mute" style="font-size:12px">${esc(x.tag)} · ${esc(x.svc)}</span></a></span></div>`;
+function idFromRoute(id) { // a link to an online title this device hasn't seen yet
+  const m = String(id).match(/^tm:([ms])(\d+)$/); if (!m || BY[id]) return BY[id];
+  return BY[id] = { id, kind: m[1] === "m" ? "movie" : "series", tmdb: +m[2], title: "Loading…", themes: [] };
+}
 function servicesPage() {
   document.body.style.removeProperty("--bg");
   let h = header() + accountPanel() + `<h1 class="disp" style="margin:6px 0 4px;font-size:40px;font-weight:800;letter-spacing:-.03em">My Services</h1><p class="mute" style="margin:0 0 20px">Turn on what you use and tell vene how you get it. Nothing is connected or checked.</p>`;
@@ -611,7 +712,7 @@ function servicesPage() {
 /* ---------- add-to-playlist sheet ---------- */
 let sheetId = null;
 function openSheet(id) {
-  sheetId = id; const it = BY[id];
+  sheetId = id; keepItem(id); const it = BY[id];
   $("sheetbox").innerHTML = `<span style="display:block;width:40px;height:5px;border-radius:999px;background:rgba(246,237,227,.3);margin:0 auto 14px"></span><div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><span style="width:72px;height:41px;border-radius:9px;flex:none;background:#2A1C24 center/cover;${bgUrl(art(it, true))}"></span><span style="min-width:0"><b style="display:block">${esc(it.title)}</b><span class="mute" style="font-size:12px">${esc(it.kind === "episode" ? showOf(it).title + " · " + se(it) : "Movie")}</span></span></div>
   <h2 class="disp" style="margin:0 0 12px;font-size:22px">Add to playlist</h2>
   <form id="newplform" style="display:flex;gap:8px;margin-bottom:12px"><input id="newplname" class="warm" placeholder="New playlist name" aria-label="New playlist name" style="flex:1;border-radius:14px;padding:12px 14px;color:var(--ink);font:500 15px var(--body);outline:none"><button class="btnp" style="height:46px;padding:0 18px">Create</button></form>
@@ -775,6 +876,7 @@ document.addEventListener("click", e => {
   if (d.signout) { SYNC.sb.auth.signOut().then(() => { SYNC.user = null; SYNC.at = null; try { localStorage.removeItem("vene.mergedFor"); } catch (er) {} toast("Signed out. Your things stay on this device"); render(); }); return; }
   if (d.authback) { SYNC.step = null; SYNC.err = ""; return refreshAccount(); }
   if (d.renameMe) { const n = window.prompt("Your name", ST.name || ""); if (n && n.trim()) { ST.name = n.trim(); save(); render(); } return; }
+  if (d.season) { const [sid, sn] = d.season.split("|"); seasonSel[sid] = +sn; document.querySelectorAll("[data-season]").forEach(c => c.classList.toggle("on", c === b)); const box = $("eplist"); if (box) { box.dataset.for = sid + "|" + sn; box.innerHTML = `<div class="empty">Loading season ${sn}…</div>`; fillSeason(BY[sid], +sn); } return; }
   if (d.hulu) { VeneTV.setHulu(+d.hulu); toast("Hulu will open with way " + d.hulu); render(); const c = document.querySelector(`[data-hulu="${d.hulu}"]`); if (c) c.focus(); return; }
   if (d.tvmove) { const [pid, j] = d.tvmove.split("|"); tvMove = { pid, j: +j }; render(); const b = document.querySelector(`[data-tvmove="${pid}|${j}"]`); if (b) b.focus(); return; }
   if (d.mv) { const [pid, j, dir] = d.mv.split("|"); const p = plOf(pid), i = +j, k = i + +dir; if (k < 0 || k >= p.items.length) return; [p.items[i], p.items[k]] = [p.items[k], p.items[i]]; threadSel[pid] = k; save(); return render(); }
@@ -787,7 +889,7 @@ document.addEventListener("click", e => {
   if (d.add) return openSheet(d.add);
   if (d.tgl) { const p = plOf(d.tgl); const i = p.items.indexOf(sheetId); if (i > -1) p.items.splice(i, 1); else p.items.push(sheetId); save(); return openSheet(sheetId); }
   if (d.closesheet) return closeSheet();
-  if (d.save) { const i = ST.lib.indexOf(d.save); if (i > -1) { ST.lib.splice(i, 1); toast("Removed from Library"); } else { ST.lib.push(d.save); toast("Saved to Library"); } save(); return render(); }
+  if (d.save) { keepItem(d.save); const i = ST.lib.indexOf(d.save); if (i > -1) { ST.lib.splice(i, 1); toast("Removed from Library"); } else { ST.lib.push(d.save); toast("Saved to Library"); } save(); return render(); }
   if (d.own) { const [id, n] = d.own.split("|"); if (ST.own[id] === n) { delete ST.own[id]; toast("Removed from your purchases"); } else { ST.own[id] = n; toast("Plays from " + n + " first"); } save(); return render(); }
   if (d.trailer) { const box = $("trailerbox"); if (box.innerHTML) { box.innerHTML = ""; return; } box.innerHTML = `<div style="margin-top:22px;max-width:760px;aspect-ratio:16/9;border-radius:20px;overflow:hidden;box-shadow:0 30px 60px rgba(0,0,0,.6)"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(d.trailer)}?autoplay=1&playsinline=1&rel=0" title="Trailer" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen style="width:100%;height:100%;border:0"></iframe></div>`; return; }
   if (d.sv) { const i = ST.sv.indexOf(d.sv); if (i > -1) ST.sv.splice(i, 1); else ST.sv.push(d.sv); save(); return render(); }

@@ -1,0 +1,243 @@
+// vene online service (Supabase Edge Function "vene").
+// Searches TMDB and asks Watchmode where a title streams, using keys kept in Supabase secrets
+// (TMDB_API_KEY, WATCHMODE_API_KEY). Only signed-in people on the family list can use it.
+// Answers are cached in public.vene_cache so Watchmode credits aren't spent twice on the same title.
+
+const TMDB_KEY = Deno.env.get("TMDB_API_KEY") ?? "";
+const WM_KEY = Deno.env.get("WATCHMODE_API_KEY") ?? "";
+const SB_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const PUBLIC_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "sb_publishable_V5Z7RmGmbNizJn5aQyik6g_VetzDUyr";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+const reply = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+
+const DAY = 86400000;
+const IMG = (p: string | null | undefined, size: string) => (p ? `https://image.tmdb.org/t/p/${size}${p}` : null);
+const year = (d?: string) => (d && /^\d{4}/.test(d) ? +d.slice(0, 4) : null);
+
+/* ---------- who is asking ---------- */
+async function allowed(auth: string | null): Promise<boolean> {
+  if (!auth || !auth.startsWith("Bearer ")) return false;
+  const r = await fetch(`${SB_URL}/rest/v1/rpc/vene_allowed`, {
+    method: "POST",
+    headers: { apikey: PUBLIC_KEY, Authorization: auth, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  return r.ok && (await r.json()) === true;
+}
+
+/* ---------- cache (only this function can read or write it) ---------- */
+function serviceHeaders(): Record<string, string> {
+  const h: Record<string, string> = { apikey: SERVICE_KEY, "Content-Type": "application/json" };
+  if (SERVICE_KEY.startsWith("eyJ")) h.Authorization = `Bearer ${SERVICE_KEY}`;
+  return h;
+}
+async function cached<T>(key: string, maxAge: number, make: () => Promise<T>): Promise<T> {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/vene_cache?key=eq.${encodeURIComponent(key)}&select=data,fetched_at`, {
+      headers: serviceHeaders(),
+    });
+    if (r.ok) {
+      const rows = await r.json();
+      if (rows[0] && Date.now() - Date.parse(rows[0].fetched_at) < maxAge) return rows[0].data as T;
+    }
+  } catch (_) { /* no cache: carry on */ }
+  const data = await make();
+  try {
+    await fetch(`${SB_URL}/rest/v1/vene_cache`, {
+      method: "POST",
+      headers: { ...serviceHeaders(), Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({ key, data, fetched_at: new Date().toISOString() }),
+    });
+  } catch (_) { /* fine */ }
+  return data;
+}
+
+/* ---------- TMDB ---------- */
+async function tmdb(path: string, params: Record<string, string | number> = {}) {
+  const q = new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)]));
+  const headers: Record<string, string> = { accept: "application/json" };
+  if (TMDB_KEY.startsWith("eyJ")) headers.Authorization = `Bearer ${TMDB_KEY}`;
+  else q.set("api_key", TMDB_KEY);
+  const r = await fetch(`https://api.themoviedb.org/3${path}?${q}`, { headers });
+  if (!r.ok) throw new Error(`TMDB ${r.status}`);
+  return await r.json();
+}
+// deno-lint-ignore no-explicit-any
+const lite = (x: any, kind: "movie" | "series") => ({
+  kind, tmdb: x.id, title: kind === "movie" ? x.title : x.name,
+  year: year(kind === "movie" ? x.release_date : x.first_air_date),
+  img: IMG(x.poster_path, "w342"), bg: IMG(x.backdrop_path, "w780"), ov: x.overview || "",
+});
+// deno-lint-ignore no-explicit-any
+const trailerOf = (d: any) =>
+  ((d.videos?.results ?? []) as { site: string; type: string; key: string; official?: boolean }[])
+    .filter((v) => v.site === "YouTube" && v.type === "Trailer")
+    .sort((a, b) => Number(!!b.official) - Number(!!a.official))[0]?.key ?? null;
+
+/* ---------- Watchmode: where to watch ---------- */
+function mapSource(name: string, type: string): [string, string | null] | null {
+  const n = name.toLowerCase();
+  if (type === "free") {
+    if (n.startsWith("youtube")) return ["YouTube", null];
+    if (n.includes("tubi")) return ["Tubi", null];
+    if (n.includes("pluto")) return ["Pluto TV", null];
+    if (n === "plex") return ["Plex", null];
+    if (n.startsWith("peacock")) return ["Peacock", null];
+    return null;
+  }
+  if (type !== "sub") return null;
+  if (n === "hulu on disney+") return ["Hulu", "Disney+"];
+  if (n.includes("hbo") || n === "max" || n.startsWith("max ")) {
+    if (n.includes("via hulu")) return ["HBO Max", "Hulu"];
+    if (n.includes("amazon")) return ["HBO Max", "Prime Video"];
+    if (n.includes("roku")) return null;
+    return ["HBO Max", null];
+  }
+  if (n.startsWith("starz")) return n.includes("amazon") ? ["STARZ", "Prime Video"] : n.includes("hulu") ? ["STARZ", "Hulu"] : n.includes("roku") || n.includes("apple") ? null : ["STARZ", null];
+  if (n.startsWith("peacock")) return n.includes("amazon") ? ["Peacock", "Prime Video"] : ["Peacock", null];
+  if (n.startsWith("paramount")) {
+    if (n.includes("amazon")) return ["Paramount+", "Prime Video"];
+    if (n.includes("roku") || n.includes("apple")) return null;
+    return ["Paramount+", null];
+  }
+  if (n.startsWith("netflix")) return ["Netflix", null];
+  if (n === "hulu") return ["Hulu", null];
+  if (n === "disney+") return ["Disney+", null];
+  if (n === "prime video") return ["Prime Video", null];
+  if (["appletv+", "apple tv+", "apple tv"].includes(n)) return ["Apple TV+", null];
+  return null;
+}
+const STORES: Record<string, string> = { AppleTV: "Apple TV", Amazon: "Prime Video", "Fandango at Home": "Fandango at Home", "Google Play": "Google TV" };
+const TRACKING = new Set(["searchreferral", "source", "at", "ct", "itscg", "itsct", "ref", "utm_source", "utm_medium", "utm_campaign"]);
+function clean(u: string): string {
+  try {
+    const url = new URL(u);
+    if ((url.hostname.includes("qflm.net") || url.hostname.includes("sjv.io")) && url.searchParams.get("u")) return clean(url.searchParams.get("u")!);
+    for (const k of [...url.searchParams.keys()]) if (TRACKING.has(k.toLowerCase())) url.searchParams.delete(k);
+    url.hash = "";
+    return url.toString();
+  } catch (_) { return u; }
+}
+async function whereToWatch(kind: "movie" | "series", id: number) {
+  const r = await fetch(`https://api.watchmode.com/v1/title/${kind === "movie" ? "movie" : "tv"}-${id}/sources/?regions=US&apiKey=${encodeURIComponent(WM_KEY)}`);
+  const data = r.ok ? await r.json() : [];
+  if (!Array.isArray(data)) return { src: [], buy: {} };
+  const src: { svc: string; via: string | null; u: string; free: boolean }[] = [];
+  const buy: Record<string, string> = {};
+  const seen = new Set<string>();
+  for (const s of data) {
+    const url = String(s.web_url || "");
+    if (!url.startsWith("http")) continue;
+    if (s.type === "buy" || s.type === "rent") {
+      const store = STORES[s.name];
+      if (store && !buy[store]) buy[store] = clean(url);
+    }
+    const m = mapSource(String(s.name || ""), String(s.type || ""));
+    if (!m || seen.has(m.join("|"))) continue;
+    seen.add(m.join("|"));
+    src.push({ svc: m[0], via: m[1], u: clean(url), free: s.type === "free" });
+  }
+  return { src, buy };
+}
+
+/* ---------- what vene asks for ---------- */
+async function search(q: string) {
+  const d = await tmdb("/search/multi", { query: q, include_adult: "false", language: "en-US", page: 1 });
+  // deno-lint-ignore no-explicit-any
+  return (d.results ?? []).filter((x: any) => x.media_type === "movie" || x.media_type === "tv")
+    // deno-lint-ignore no-explicit-any
+    .map((x: any) => lite(x, x.media_type === "movie" ? "movie" : "series")).slice(0, 24);
+}
+async function title(kind: "movie" | "series", id: number) {
+  if (kind === "movie") {
+    const d = await tmdb(`/movie/${id}`, { append_to_response: "videos", language: "en-US" });
+    return { ...lite(d, "movie"), min: d.runtime || null, trailer: trailerOf(d), genres: (d.genres ?? []).map((g: { name: string }) => g.name), ...(await whereToWatch("movie", id)), checked: new Date().toISOString().slice(0, 10) };
+  }
+  const d = await tmdb(`/tv/${id}`, { append_to_response: "videos", language: "en-US" });
+  return {
+    ...lite(d, "series"), min: d.episode_run_time?.[0] || null, trailer: trailerOf(d),
+    genres: (d.genres ?? []).map((g: { name: string }) => g.name),
+    seasons: (d.seasons ?? []).filter((s: { season_number: number }) => s.season_number > 0)
+      .map((s: { season_number: number; episode_count: number; name: string }) => ({ s: s.season_number, n: s.episode_count, name: s.name })),
+    ...(await whereToWatch("series", id)), checked: new Date().toISOString().slice(0, 10),
+  };
+}
+async function season(id: number, s: number) {
+  const d = await tmdb(`/tv/${id}/season/${s}`, { language: "en-US" });
+  // deno-lint-ignore no-explicit-any
+  return (d.episodes ?? []).map((e: any) => ({
+    s: e.season_number, e: e.episode_number, title: e.name, ov: e.overview || "",
+    img: IMG(e.still_path, "w300"), bg: IMG(e.still_path, "w780"), min: e.runtime || null, year: year(e.air_date), air: e.air_date || null,
+  }));
+}
+// TMDB watch-provider ids (US) for new movies, and the TV networks whose new episodes land on each service
+const PROVIDERS: Record<string, string> = {
+  "Netflix": "8", "Hulu": "15", "Disney+": "337", "Prime Video": "9", "Peacock": "386|387", "HBO Max": "1899",
+  "Paramount+": "531", "Apple TV+": "350", "Tubi": "73", "Pluto TV": "300",
+};
+const NETWORKS: Record<string, string> = {
+  "Netflix": "213", "Hulu": "453|2|88|19", "Disney+": "2739", "Prime Video": "1024", "Peacock": "3353|6",
+  "HBO Max": "49|3186", "Paramount+": "4330|16", "Apple TV+": "2552",
+};
+async function fresh(svc: string) {
+  const p = PROVIDERS[svc];
+  if (!p) return [];
+  const today = new Date(), iso = (d: Date) => d.toISOString().slice(0, 10);
+  const since = (days: number) => iso(new Date(today.getTime() - days * DAY));
+  const tvAsk = NETWORKS[svc]
+    ? tmdb("/discover/tv", { with_networks: NETWORKS[svc], language: "en-US", sort_by: "popularity.desc", "air_date.gte": since(8), "air_date.lte": iso(today), without_genres: "10763|10767", "vote_count.gte": 10 })
+    : Promise.resolve({ results: [] });
+  const [m, t] = await Promise.all([
+    tmdb("/discover/movie", { watch_region: "US", with_watch_providers: p, with_watch_monetization_types: svc === "Tubi" || svc === "Pluto TV" ? "free|ads" : "flatrate", language: "en-US", sort_by: "popularity.desc", "primary_release_date.gte": since(150), "primary_release_date.lte": iso(today), "vote_count.gte": 20 }),
+    tvAsk,
+  ]);
+  // deno-lint-ignore no-explicit-any
+  const mv = (m.results ?? []).slice(0, 4).map((x: any) => ({ ...lite(x, "movie"), svc, tag: "New movie" }));
+  // deno-lint-ignore no-explicit-any
+  const tv = (t.results ?? []).slice(0, 4).map((x: any) => ({ ...lite(x, "series"), svc, tag: "New episodes" }));
+  return [...tv, ...mv];
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST") return reply({ error: "POST only" }, 405);
+  if (!(await allowed(req.headers.get("Authorization")))) return reply({ error: "not_allowed" }, 403);
+  if (!TMDB_KEY || !WM_KEY) return reply({ error: "missing_keys" }, 500);
+  let b: Record<string, unknown>;
+  try { b = await req.json(); } catch (_) { return reply({ error: "bad_request" }, 400); }
+  try {
+    const id = Math.floor(Number(b.id)), kind = b.kind === "series" ? "series" : "movie";
+    switch (b.action) {
+      case "search": {
+        const q = String(b.q ?? "").trim().slice(0, 100);
+        if (!q) return reply({ results: [] });
+        return reply({ results: await cached(`search:${q.toLowerCase()}`, DAY, () => search(q)) });
+      }
+      case "title":
+        if (!(id > 0)) return reply({ error: "bad_request" }, 400);
+        return reply({ title: await cached(`title:${kind}:${id}`, 7 * DAY, () => title(kind, id)) });
+      case "season": {
+        const s = Math.floor(Number(b.s));
+        if (!(id > 0) || !(s >= 0)) return reply({ error: "bad_request" }, 400);
+        return reply({ episodes: await cached(`season:${id}:${s}`, 3 * DAY, () => season(id, s)) });
+      }
+      case "fresh": {
+        const svcs = (Array.isArray(b.svcs) ? b.svcs : []).map(String).filter((s) => PROVIDERS[s]).slice(0, 10);
+        const day = new Date().toISOString().slice(0, 10);
+        const lists = await Promise.all(svcs.map((s) => cached(`fresh:${s}:${day}`, DAY / 2, () => fresh(s))));
+        return reply({ fresh: lists });
+      }
+      default:
+        return reply({ error: "unknown_action" }, 400);
+    }
+  } catch (e) {
+    return reply({ error: "upstream", detail: String((e as Error).message ?? e) }, 502);
+  }
+});
