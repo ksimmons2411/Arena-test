@@ -314,7 +314,7 @@ function target(it) {
   if (!p) { const h = srcs.find(x => ST.sv.includes(x.svc) && ST.via[x.svc] && SVC[ST.via[x.svc]]); if (h) { const app = ST.via[h.svc]; return { n: app, u: SVC[app].q + q, mine: true, search: true, check: true, svc: h.svc }; } }
   const s = p || srcs.find(x => !BROKEN(x)) || srcs[0], app = s.via || s.svc;
   if (BROKEN(s) && s.svc === "Pluto TV") return { n: "Pluto TV", u: s.u, mine: !!p, svc: "Pluto TV" };
-  if (BROKEN(s)) return { n: "Paramount+", u: "https://www.paramountplus.com/", mine: !!p, svc: "Paramount+", copy: base.title, openApp: true };
+  if (BROKEN(s)) return { n: "Paramount+", u: isTV() ? SVC["Paramount+"].q + encodeURIComponent(base.title) : "https://www.paramountplus.com/", mine: !!p, svc: "Paramount+", copy: base.title, openApp: true };
   if (it.kind === "episode") return { n: app, u: SVC[app] && SVC[app].q ? SVC[app].q + q : s.u, mine: !!p, search: true, svc: s.svc };
   return { n: s.via ? s.svc + " in " + s.via : s.svc, u: s.u, mine: !!p, svc: s.svc, search: !!s.search };
 }
@@ -338,8 +338,34 @@ function header() {
 /* ---------- home ---------- */
 let heroK = 0, heroFocus = true, heroA, heroB, heroAuto = true;
 function seasonTheme() { const m = new Date().getMonth(); return m === 9 ? "Halloween" : m === 10 ? "Thanksgiving" : m === 11 ? "Christmas" : m === 1 ? "Romance" : "Family"; }
+/* This week's four: a new set every Monday, from the holiday's picks on TMDB (your services first),
+   your own playlists for the holiday, and vene's starter titles. Remembered for the week. */
+const weekNo = () => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return Math.floor(d.getTime() / 604800000); };
+function weekly() { try { const w = JSON.parse(localStorage.getItem("vene.hero") || "null"); if (w && w.week === weekNo() && w.th === seasonTheme()) { w.items.forEach(x => { if (!BY[x.id]) BY[x.id] = x; else if (!BY[x.id].src && x.src) Object.assign(BY[x.id], x); }); const four = w.ids.map(id => BY[id]).filter(Boolean); if (four.length === 4) return four; } } catch (e) {} return null; }
+let heroBusy = false;
+async function refreshHero() {
+  if (heroBusy || !SYNC.user || weekly()) return; heroBusy = true;
+  try {
+    const th = seasonTheme(), wk = weekNo();
+    let seed = wk * 2654435761 % 4294967296; const rnd = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+    const shuffle = a => a.map(x => [rnd(), x]).sort((p, q) => p[0] - q[0]).map(x => x[1]);
+    const [mine, all] = await Promise.all([net("discover", { kind: "movie", genre: th, sort: "popular", mine: true, svcs: ST.sv, page: 1 }), net("discover", { kind: "movie", genre: th, sort: "popular", mine: false, svcs: ST.sv, page: 1 })]);
+    const yours = ST.pls.filter(p => p.name.toLowerCase().includes(th.toLowerCase())).flatMap(p => p.items).concat(ST.pls.flatMap(p => p.items).filter(id => BY[id] && (BY[id].themes || []).includes(th))).map(id => BY[id]).filter(x => x && x.kind !== "series" && art(x, true));
+    const starter = D.items.filter(x => x.kind !== "series" && (x.themes || []).includes(th) && art(x, true));
+    const fits = x => x.bg && (th === "Halloween" || !(x.g || []).some(g => g === 27 || g === 53)); // no horror or thrillers outside Halloween
+    const net1 = (mine.results || []).filter(fits).map(fromNet), net2 = (all.results || []).filter(fits).map(fromNet);
+    const groups = [shuffle([...new Set(yours)]), shuffle(net1.slice(0, 12)), shuffle(starter), shuffle(net2.slice(0, 12))];
+    const four = [], shows = new Set();
+    for (let round = 0; four.length < 4 && round < 12; round++) for (const g of groups) { const x = g.shift(); if (x && four.length < 4 && !shows.has(showOf(x).id)) { shows.add(showOf(x).id); four.push(x); } }
+    if (four.length < 4) return;
+    await Promise.all(four.map(x => needFull(showOf(x))));
+    const items = four.flatMap(x => [x, showOf(x)]).filter(x => String(x.id).startsWith("tm:")).map(slimItem);
+    try { localStorage.setItem("vene.hero", JSON.stringify({ week: wk, th, ids: four.map(x => x.id), items })); } catch (e) {}
+    if (route().v === "home" && !(document.activeElement && document.activeElement.closest && document.activeElement.closest("#app") && !document.activeElement.closest("#herotext"))) { heroK = 0; const y = scrollY; render(); scrollTo(0, y); }
+  } finally { heroBusy = false; }
+}
 function heroFour() {
-  const th = seasonTheme();
+  const th = seasonTheme(), wk = weekly(); if (wk) return { th, four: wk };
   const pool = D.items.filter(x => x.kind !== "series" && (x.themes || []).includes(th) && art(x, true));
   const four = []; const seen = new Set();
   for (const x of pool) { const k = showOf(x).id; if (!seen.has(k)) { seen.add(k); four.push(x); } if (four.length === 4) break; }
@@ -421,7 +447,7 @@ function home() {
   });
   h += `<p class="credit">Titles, episode details and artwork: TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB. Where to watch: <a href="https://www.watchmode.com/" target="_blank" rel="noopener">Watchmode</a>, checked ${esc(checkedOn())}.</p>`;
   $("app").innerHTML = h;
-  heroText(four, th); placeSquares(); heroLoop(four, th); fillFresh();
+  heroText(four, th); placeSquares(); heroLoop(four, th); fillFresh(); refreshHero();
   if (document.documentElement.classList.contains("tv")) { document.querySelectorAll(".sq").forEach(x => x.tabIndex = -1); const f = document.querySelector("#herotext .btnp"); if (f && !document.activeElement.closest?.("#app")) f.focus(); }
   window.__four = { four, th };
 }
@@ -452,7 +478,7 @@ function titlePage(id) {
   if (waiting) h += `<p class="mute" style="margin:6px 0">Checking where this streams…</p>`;
   else if (!srcs.length && !Object.keys(base.buy || {}).length) h += `<p class="mute" style="margin:6px 0">Not on any service vene tracks right now.</p>`;
   srcs.forEach(s => { const sv = SVC[s.svc] || { t: "", c: "#9C8C8A", f: "#fff" }, isPick = !chosen.owned && chosen.svc === s.svc && (chosen.n.includes(s.via || s.svc));
-    const rowU = BROKEN(s) && s.svc === "Paramount+" ? "https://www.paramountplus.com/" : ep && !ST.links[it.id] ? (SVC[s.via || s.svc] && SVC[s.via || s.svc].q ? SVC[s.via || s.svc].q + encodeURIComponent(base.title) : s.u) : s.u;
+    const rowU = BROKEN(s) && s.svc === "Paramount+" ? (isTV() ? SVC["Paramount+"].q + encodeURIComponent(base.title) : "https://www.paramountplus.com/") : ep && !ST.links[it.id] ? (SVC[s.via || s.svc] && SVC[s.via || s.svc].q ? SVC[s.via || s.svc].q + encodeURIComponent(base.title) : s.u) : s.u;
     h += `<a href="${esc(rowU)}" style="text-decoration:none;display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:14px;${isPick ? "background:rgba(255,178,56,.10);border:1px solid rgba(255,178,56,.3)" : ""}">${isPick ? `<span style="width:28px;height:28px;border-radius:999px;background:${sv.c};color:${sv.f};font:800 10px var(--body);display:grid;place-items:center;box-shadow:0 0 0 3px rgba(255,178,56,.35)">${esc(sv.t)}</span>` : `<span style="width:12px;height:12px;margin:0 8px;border-radius:999px;background:${sv.c}"></span>`}<span style="flex:1;display:flex;flex-direction:column"><b style="font-weight:${isPick ? 700 : 500}">${esc(s.svc)}${s.via ? `, inside ${esc(s.via)}` : ""}</b>${isPick ? `<span style="font-size:12px;color:var(--amber-hi)">${chosen.mine ? "Yours · " : ""}${ep ? "opens a search for the show" : "opens here"}</span>` : ""}</span><span class="mute" style="font-size:12px">${BROKEN(s) && s.svc === "Paramount+" ? "Opens the app; search there" : s.free ? "Free · tap to open" : ST.sv.includes(s.svc) ? "In My Services" : "Tap to open"}</span></a>`; });
   const buys = Object.keys(base.buy || {});
   if (buys.length) h += `<div style="display:flex;align-items:center;gap:12px;padding:9px 10px"><span style="width:12px;height:12px;margin:0 8px;border-radius:999px;background:#9C8C8A"></span><span style="flex:1;display:flex;flex-direction:column"><span>Rent or buy</span><span class="mute" style="font-size:12px">${buys.map(b => `<a href="${esc(base.buy[b])}">${esc(b)}</a>`).join(" · ")}</span></span></div>`;
@@ -705,7 +731,7 @@ const LOADED_AT = Date.now();
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - LOADED_AT > 3600000 && !busyNow()) location.reload(); });
 setInterval(() => { if (Date.now() - LOADED_AT > 6 * 3600000 && !busyNow() && route().v === "home") location.reload(); }, 600000);
 if (SYNC.sb) {
-  SYNC.sb.auth.getSession().then(({ data }) => { SYNC.user = data.session ? data.session.user : null; if (SYNC.user) { syncPull(); render(); } });
+  SYNC.sb.auth.getSession().then(({ data }) => { SYNC.user = data.session ? data.session.user : null; if (SYNC.user) { syncPull(); render(); if (isTV()) tvFocus(); } });
   SYNC.sb.auth.onAuthStateChange((ev, session) => { const was = SYNC.user; SYNC.user = session ? session.user : null; if (ev === "SIGNED_IN" && !was) syncPull(true); });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") syncPull(); });
   window.addEventListener("focus", () => syncPull());
