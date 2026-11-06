@@ -1,5 +1,7 @@
 // vene online service (Supabase Edge Function "vene").
-// Searches TMDB and asks Watchmode where a title streams, using keys kept in Supabase secrets
+// Searches TMDB, builds Essentials and Browse lists, shares playlists, and works out where a title
+// streams: TMDB's where-to-watch data (from JustWatch, kept current) decides WHICH services have it,
+// Watchmode supplies the direct links when it has them. Keys live in Supabase secrets
 // (TMDB_API_KEY, WATCHMODE_API_KEY). Only signed-in people on the family list can use it.
 // Answers are cached in public.vene_cache so Watchmode credits aren't spent twice on the same title.
 
@@ -20,6 +22,8 @@ const reply = (body: unknown, status = 200) =>
 const DAY = 86400000;
 const IMG = (p: string | null | undefined, size: string) => (p ? `https://image.tmdb.org/t/p/${size}${p}` : null);
 const year = (d?: string) => (d && /^\d{4}/.test(d) ? +d.slice(0, 4) : null);
+// deno-lint-ignore no-explicit-any
+type Any = any;
 
 /* ---------- who is asking ---------- */
 async function allowed(auth: string | null): Promise<boolean> {
@@ -31,8 +35,12 @@ async function allowed(auth: string | null): Promise<boolean> {
   });
   return r.ok && (await r.json()) === true;
 }
+async function userId(auth: string): Promise<string | null> {
+  const r = await fetch(`${SB_URL}/auth/v1/user`, { headers: { apikey: PUBLIC_KEY, Authorization: auth } });
+  return r.ok ? ((await r.json()).id ?? null) : null;
+}
 
-/* ---------- cache (only this function can read or write it) ---------- */
+/* ---------- storage only this function can use (cache, shared playlists) ---------- */
 function serviceHeaders(): Record<string, string> {
   const h: Record<string, string> = { apikey: SERVICE_KEY, "Content-Type": "application/json" };
   if (SERVICE_KEY.startsWith("eyJ")) h.Authorization = `Bearer ${SERVICE_KEY}`;
@@ -40,9 +48,7 @@ function serviceHeaders(): Record<string, string> {
 }
 async function cached<T>(key: string, maxAge: number, make: () => Promise<T>): Promise<T> {
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/vene_cache?key=eq.${encodeURIComponent(key)}&select=data,fetched_at`, {
-      headers: serviceHeaders(),
-    });
+    const r = await fetch(`${SB_URL}/rest/v1/vene_cache?key=eq.${encodeURIComponent(key)}&select=data,fetched_at`, { headers: serviceHeaders() });
     if (r.ok) {
       const rows = await r.json();
       if (rows[0] && Date.now() - Date.parse(rows[0].fetched_at) < maxAge) return rows[0].data as T;
@@ -69,20 +75,43 @@ async function tmdb(path: string, params: Record<string, string | number> = {}) 
   if (!r.ok) throw new Error(`TMDB ${r.status}`);
   return await r.json();
 }
-// deno-lint-ignore no-explicit-any
-const lite = (x: any, kind: "movie" | "series") => ({
+const lite = (x: Any, kind: "movie" | "series") => ({
   kind, tmdb: x.id, title: kind === "movie" ? x.title : x.name,
   year: year(kind === "movie" ? x.release_date : x.first_air_date),
-  img: IMG(x.poster_path, "w342"), bg: IMG(x.backdrop_path, "w780"), ov: x.overview || "",
+  img: IMG(x.poster_path, "w342"), bg: IMG(x.backdrop_path, "w780"), ov: x.overview || "", g: x.genre_ids ?? undefined,
 });
-// deno-lint-ignore no-explicit-any
-const trailerOf = (d: any) =>
+const trailerOf = (d: Any) =>
   ((d.videos?.results ?? []) as { site: string; type: string; key: string; official?: boolean }[])
     .filter((v) => v.site === "YouTube" && v.type === "Trailer")
     .sort((a, b) => Number(!!b.official) - Number(!!a.official))[0]?.key ?? null;
 
-/* ---------- Watchmode: where to watch ---------- */
-function mapSource(name: string, type: string): [string, string | null] | null {
+/* ---------- links ---------- */
+const TRACKING = new Set(["searchreferral", "source", "at", "ct", "itscg", "itsct", "ref", "ref_", "utm_source", "utm_medium", "utm_campaign", "autoplay"]);
+function clean(u: string): string {
+  try {
+    const url = new URL(u);
+    if ((url.hostname.includes("qflm.net") || url.hostname.includes("sjv.io")) && url.searchParams.get("u")) return clean(url.searchParams.get("u")!);
+    // Prime Video: one link shape for everything (the one that opened title pages in the link test)
+    if (/(^|\.)(amazon\.com|primevideo\.com)$/.test(url.hostname)) {
+      const gti = url.searchParams.get("gti") ?? url.pathname.split("/").find((p) => p.startsWith("amzn1.dv.gti."));
+      if (gti) return `https://watch.amazon.com/detail?gti=${gti}`;
+    }
+    for (const k of [...url.searchParams.keys()]) if (TRACKING.has(k.toLowerCase())) url.searchParams.delete(k);
+    url.hash = "";
+    return url.toString();
+  } catch (_) { return u; }
+}
+const SEARCH: Record<string, string> = {
+  "Netflix": "https://www.netflix.com/search?q=", "Hulu": "https://www.hulu.com/search?q=", "Disney+": "https://www.disneyplus.com/search?q=",
+  "Prime Video": "https://www.primevideo.com/search?phrase=", "Peacock": "https://www.peacocktv.com/watch/search?q=", "HBO Max": "https://play.hbomax.com/search?q=",
+  "Paramount+": "https://www.paramountplus.com/search/?q=", "Apple TV+": "https://tv.apple.com/search?term=", "YouTube": "https://www.youtube.com/results?search_query=",
+  "Tubi": "https://tubitv.com/search/", "Pluto TV": "https://pluto.tv/search/details?query=", "Plex": "https://watch.plex.tv/search?q=", "Philo": "https://www.philo.com/player/search?q=",
+  "STARZ": "https://www.starz.com/us/en/search?q=",
+};
+
+/* ---------- where to watch ---------- */
+// Watchmode source name -> [vene service, app it plays inside or null]
+function wmService(name: string, type: string): [string, string | null] | null {
   const n = name.toLowerCase();
   if (type === "free") {
     if (n.startsWith("youtube")) return ["YouTube", null];
@@ -90,6 +119,8 @@ function mapSource(name: string, type: string): [string, string | null] | null {
     if (n.includes("pluto")) return ["Pluto TV", null];
     if (n === "plex") return ["Plex", null];
     if (n.startsWith("peacock")) return ["Peacock", null];
+    if (n.startsWith("prime video") || n.includes("freevee")) return ["Prime Video", null];
+    if (n.startsWith("philo")) return ["Philo", null];
     return null;
   }
   if (type !== "sub") return null;
@@ -107,6 +138,7 @@ function mapSource(name: string, type: string): [string, string | null] | null {
     if (n.includes("roku") || n.includes("apple")) return null;
     return ["Paramount+", null];
   }
+  if (n.startsWith("philo")) return ["Philo", null];
   if (n.startsWith("netflix")) return ["Netflix", null];
   if (n === "hulu") return ["Hulu", null];
   if (n === "disney+") return ["Disney+", null];
@@ -114,73 +146,182 @@ function mapSource(name: string, type: string): [string, string | null] | null {
   if (["appletv+", "apple tv+", "apple tv"].includes(n)) return ["Apple TV+", null];
   return null;
 }
-const STORES: Record<string, string> = { AppleTV: "Apple TV", Amazon: "Prime Video", "Fandango at Home": "Fandango at Home", "Google Play": "Google TV" };
-const TRACKING = new Set(["searchreferral", "source", "at", "ct", "itscg", "itsct", "ref", "utm_source", "utm_medium", "utm_campaign"]);
-function clean(u: string): string {
-  try {
-    const url = new URL(u);
-    if ((url.hostname.includes("qflm.net") || url.hostname.includes("sjv.io")) && url.searchParams.get("u")) return clean(url.searchParams.get("u")!);
-    for (const k of [...url.searchParams.keys()]) if (TRACKING.has(k.toLowerCase())) url.searchParams.delete(k);
-    url.hash = "";
-    return url.toString();
-  } catch (_) { return u; }
+// TMDB (JustWatch) provider -> [vene service, app it plays inside or null]
+const TMDB_IDS: Record<number, string> = {
+  8: "Netflix", 1796: "Netflix", 15: "Hulu", 337: "Disney+", 9: "Prime Video", 2100: "Prime Video", 613: "Prime Video",
+  386: "Peacock", 387: "Peacock", 1899: "HBO Max", 384: "HBO Max", 531: "Paramount+", 2303: "Paramount+", 2616: "Paramount+",
+  350: "Apple TV+", 73: "Tubi", 300: "Pluto TV", 538: "Plex", 2383: "Philo", 43: "STARZ", 235: "YouTube",
+};
+function tmdbService(p: { provider_id: number; provider_name: string }): [string, string | null] | null {
+  if (TMDB_IDS[p.provider_id]) return [TMDB_IDS[p.provider_id], null];
+  const n = p.provider_name.toLowerCase();
+  if (n.endsWith("amazon channel")) {
+    if (n.startsWith("starz")) return ["STARZ", "Prime Video"];
+    if (n.startsWith("hbo max") || n.startsWith("max ")) return ["HBO Max", "Prime Video"];
+    if (n.startsWith("paramount")) return ["Paramount+", "Prime Video"];
+    if (n.startsWith("peacock")) return ["Peacock", "Prime Video"];
+  }
+  return null;
 }
-async function whereToWatch(kind: "movie" | "series", id: number) {
+const BUY_STORES: Record<string, string> = { AppleTV: "Apple TV", Amazon: "Prime Video", "Fandango at Home": "Fandango at Home", "Google Play": "Google TV" };
+async function whereToWatch(kind: "movie" | "series", id: number, title: string, providers: Any) {
   const r = await fetch(`https://api.watchmode.com/v1/title/${kind === "movie" ? "movie" : "tv"}-${id}/sources/?regions=US&apiKey=${encodeURIComponent(WM_KEY)}`);
   const data = r.ok ? await r.json() : [];
-  if (!Array.isArray(data)) return { src: [], buy: {} };
-  const src: { svc: string; via: string | null; u: string; free: boolean }[] = [];
+  const wm: { svc: string; via: string | null; u: string; free: boolean }[] = [];
   const buy: Record<string, string> = {};
-  const seen = new Set<string>();
-  for (const s of data) {
+  for (const s of Array.isArray(data) ? data : []) {
     const url = String(s.web_url || "");
     if (!url.startsWith("http")) continue;
-    if (s.type === "buy" || s.type === "rent") {
-      const store = STORES[s.name];
-      if (store && !buy[store]) buy[store] = clean(url);
-    }
-    const m = mapSource(String(s.name || ""), String(s.type || ""));
-    if (!m || seen.has(m.join("|"))) continue;
-    seen.add(m.join("|"));
-    src.push({ svc: m[0], via: m[1], u: clean(url), free: s.type === "free" });
+    if ((s.type === "buy" || s.type === "rent") && BUY_STORES[s.name] && !buy[BUY_STORES[s.name]]) buy[BUY_STORES[s.name]] = clean(url);
+    const m = wmService(String(s.name || ""), String(s.type || ""));
+    if (m && !wm.some((x) => x.svc === m[0] && x.via === m[1])) wm.push({ svc: m[0], via: m[1], u: clean(url), free: s.type === "free" });
   }
-  return { src, buy };
+  const us = providers?.results?.US ?? {};
+  const streaming = [...(us.flatrate ?? []).map((p: Any) => [p, false]), ...(us.free ?? []).map((p: Any) => [p, true]), ...(us.ads ?? []).map((p: Any) => [p, true])];
+  if (!streaming.length && !(us.buy ?? []).length && !(us.rent ?? []).length) return { src: wm, buy }; // TMDB knows nothing: trust Watchmode
+  const src: { svc: string; via: string | null; u: string; free: boolean; search?: boolean }[] = [];
+  for (const [p, free] of streaming) {
+    const m = tmdbService(p);
+    if (!m || src.some((x) => x.svc === m[0] && x.via === m[1])) continue;
+    const link = wm.find((x) => x.svc === m[0] && x.via === m[1]) ?? wm.find((x) => x.svc === m[0]);
+    const isFree = (free as boolean) && !["Philo", "Prime Video"].includes(m[0]);
+    if (link) src.push({ ...link, via: m[1], free: isFree || link.free });
+    else if (SEARCH[m[1] ?? m[0]]) src.push({ svc: m[0], via: m[1], u: SEARCH[m[1] ?? m[0]] + encodeURIComponent(title), free: isFree, search: true });
+  }
+  return { src, buy }; // services only Watchmode lists are left out: its free data runs behind
 }
 
-/* ---------- what vene asks for ---------- */
-async function search(q: string) {
-  const d = await tmdb("/search/multi", { query: q, include_adult: "false", language: "en-US", page: 1 });
-  // deno-lint-ignore no-explicit-any
-  return (d.results ?? []).filter((x: any) => x.media_type === "movie" || x.media_type === "tv")
-    // deno-lint-ignore no-explicit-any
-    .map((x: any) => lite(x, x.media_type === "movie" ? "movie" : "series")).slice(0, 24);
+/* ---------- search that forgives typos ---------- */
+const norm = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/&/g, "and").replace(/[^a-z0-9]+/g, " ").trim();
+function grams(s: string) { const t = ` ${norm(s)} `; const g = new Map<string, number>(); for (let i = 0; i < t.length - 2; i++) { const k = t.slice(i, i + 3); g.set(k, (g.get(k) ?? 0) + 1); } return g; }
+function similar(a: string, b: string) {
+  const A = grams(a), B = grams(b); let both = 0, total = 0;
+  for (const [k, v] of A) { both += Math.min(v, B.get(k) ?? 0); total += v; }
+  for (const v of B.values()) total += v;
+  return total ? (2 * both) / total : 0;
 }
-async function title(kind: "movie" | "series", id: number) {
-  if (kind === "movie") {
-    const d = await tmdb(`/movie/${id}`, { append_to_response: "videos", language: "en-US" });
-    return { ...lite(d, "movie"), min: d.runtime || null, trailer: trailerOf(d), genres: (d.genres ?? []).map((g: { name: string }) => g.name), ...(await whereToWatch("movie", id)), checked: new Date().toISOString().slice(0, 10) };
+async function searchOnce(q: string) {
+  const d = await tmdb("/search/multi", { query: q, include_adult: "false", language: "en-US", page: 1 });
+  return (d.results ?? []).filter((x: Any) => x.media_type === "movie" || x.media_type === "tv");
+}
+async function search(q: string) {
+  const first = await searchOnce(q);
+  const words = norm(q).split(" ").filter(Boolean);
+  const good = first.some((x: Any) => similar(x.title ?? x.name ?? "", q) > 0.6);
+  let all = first;
+  if (!good && words.length) { // likely a typo: try the starts of the words, the longest words alone, and doubled letters ("abot" -> "abbot")
+    const pre = (w: string) => (w.length >= 5 ? w.slice(0, Math.max(4, Math.ceil(w.length * 0.6))) : w);
+    const variants = new Set<string>();
+    variants.add(words.map(pre).join(" "));
+    words.filter((w) => w.length >= 4).sort((a, b) => b.length - a.length).slice(0, 2).forEach((w) => { if (w.length < 6) variants.add(w); else { variants.add(w.slice(0, Math.ceil(w.length * 0.8))); variants.add(w.slice(0, Math.max(4, Math.ceil(w.length * 0.6)))); } });
+    const w0 = words[0], rest = words.slice(1).map(pre).join(" ");
+    if (w0.length >= 3 && w0.length <= 7) for (let i = 1; i < w0.length; i++) if (!"aeiou".includes(w0[i]) && w0[i] !== w0[i - 1]) variants.add((w0.slice(0, i + 1) + w0.slice(i) + " " + rest).trim());
+    variants.delete(norm(q));
+    const more = await Promise.all([...variants].slice(0, 8).map(searchOnce));
+    all = [...first, ...more.flat()];
   }
-  const d = await tmdb(`/tv/${id}`, { append_to_response: "videos", language: "en-US" });
+  const seen = new Set<string>();
+  return all
+    .filter((x: Any) => { const k = x.media_type + x.id; if (seen.has(k)) return false; seen.add(k); return true; })
+    .map((x: Any) => { const t = x.title ?? x.name ?? ""; return { x, s: Math.max(similar(t, q), similar(t.slice(0, q.length + 2), q)) + Math.min(0.2, Math.log10(1 + (x.vote_count ?? 0)) / 20) }; })
+    .filter((r: Any) => good || r.s > 0.3)
+    .sort((a: Any, b: Any) => b.s - a.s)
+    .slice(0, 24)
+    .map(({ x }: Any) => lite(x, x.media_type === "movie" ? "movie" : "series"));
+}
+
+/* ---------- title details ---------- */
+async function title(kind: "movie" | "series", id: number) {
+  const d = await tmdb(kind === "movie" ? `/movie/${id}` : `/tv/${id}`, { append_to_response: "videos,watch/providers", language: "en-US" });
+  const base = { ...lite(d, kind), trailer: trailerOf(d), genres: (d.genres ?? []).map((g: { name: string }) => g.name), checked: new Date().toISOString().slice(0, 10) };
+  const where = await whereToWatch(kind, id, base.title, d["watch/providers"]);
+  if (kind === "movie") return { ...base, min: d.runtime || null, ...where };
   return {
-    ...lite(d, "series"), min: d.episode_run_time?.[0] || null, trailer: trailerOf(d),
-    genres: (d.genres ?? []).map((g: { name: string }) => g.name),
+    ...base, min: d.episode_run_time?.[0] || null,
     seasons: (d.seasons ?? []).filter((s: { season_number: number }) => s.season_number > 0)
       .map((s: { season_number: number; episode_count: number; name: string }) => ({ s: s.season_number, n: s.episode_count, name: s.name })),
-    ...(await whereToWatch("series", id)), checked: new Date().toISOString().slice(0, 10),
+    ...where,
   };
 }
 async function season(id: number, s: number) {
   const d = await tmdb(`/tv/${id}/season/${s}`, { language: "en-US" });
-  // deno-lint-ignore no-explicit-any
-  return (d.episodes ?? []).map((e: any) => ({
+  return (d.episodes ?? []).map((e: Any) => ({
     s: e.season_number, e: e.episode_number, title: e.name, ov: e.overview || "",
     img: IMG(e.still_path, "w300"), bg: IMG(e.still_path, "w780"), min: e.runtime || null, year: year(e.air_date), air: e.air_date || null,
   }));
 }
-// TMDB watch-provider ids (US) for new movies, and the TV networks whose new episodes land on each service
+
+/* ---------- people and Essentials ---------- */
+async function people(kind: "movie" | "series", id: number) {
+  const [c, d] = await Promise.all([
+    tmdb(kind === "movie" ? `/movie/${id}/credits` : `/tv/${id}/aggregate_credits`, { language: "en-US" }),
+    kind === "series" ? tmdb(`/tv/${id}`, { language: "en-US" }) : Promise.resolve(null),
+  ]);
+  const out: { id: number; name: string; role: string; img: string | null }[] = [];
+  const add = (p: Any, role: string) => { if (!out.some((x) => x.id === p.id)) out.push({ id: p.id, name: p.name, role, img: IMG(p.profile_path, "w185") }); };
+  if (kind === "movie") (c.crew ?? []).filter((p: Any) => p.job === "Director").slice(0, 2).forEach((p: Any) => add(p, "Director"));
+  else (d?.created_by ?? []).slice(0, 2).forEach((p: Any) => add(p, "Creator"));
+  (c.cast ?? []).slice(0, 8).forEach((p: Any) => add(p, "Cast"));
+  return out;
+}
+const NOT_A_ROLE = /\b(self|himself|herself|themselves|narrator|host|archive|uncredited|voice of)\b/i;
+async function person(id: number) {
+  const d = await tmdb(`/person/${id}`, { append_to_response: "combined_credits", language: "en-US" });
+  const directing = d.known_for_department === "Directing" || d.known_for_department === "Writing" || d.known_for_department === "Production";
+  const credits: Any[] = directing
+    ? (d.combined_credits?.crew ?? []).filter((x: Any) => ["Director", "Creator", "Executive Producer", "Writer", "Screenplay"].includes(x.job))
+    : (d.combined_credits?.cast ?? []).filter((x: Any) => !NOT_A_ROLE.test(x.character ?? "") && (x.media_type === "movie" || (x.episode_count ?? 0) >= 4));
+  const seen = new Set<string>();
+  const items = credits
+    .filter((x: Any) => x.poster_path && !(x.genre_ids ?? []).some((g: number) => g === 10767 || g === 10763 || g === 99) && (x.vote_count ?? 0) >= 40)
+    .filter((x: Any) => { const k = x.media_type + x.id; if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a: Any, b: Any) => (b.vote_count ?? 0) * (b.vote_average ?? 5) - (a.vote_count ?? 0) * (a.vote_average ?? 5))
+    .slice(0, 15)
+    .map((x: Any) => lite(x, x.media_type === "movie" ? "movie" : "series"));
+  return { id: d.id, name: d.name, img: IMG(d.profile_path, "w342"), dept: d.known_for_department, items };
+}
+async function popularPeople() { // well-known people right now, from English-language film and TV
+  const pages = await Promise.all([1, 2, 3].map((page) => tmdb("/person/popular", { language: "en-US", page })));
+  return pages.flatMap((d) => d.results ?? [])
+    .filter((p: Any) => p.profile_path && !p.adult && ["Acting", "Directing"].includes(p.known_for_department)
+      && (p.known_for ?? []).length >= 2 && (p.known_for ?? []).every((k: Any) => k.original_language === "en")
+      && (p.known_for ?? []).some((k: Any) => (k.vote_count ?? 0) > 3000))
+    .slice(0, 12).map((p: Any) => ({ id: p.id, name: p.name, img: IMG(p.profile_path, "w185") }));
+}
+
+/* ---------- Browse: discover beyond the starter catalog ---------- */
+const GENRES: Record<string, [number | null, number | null, string?]> = { // [movie genre, tv genre, holiday keyword]
+  Romance: [10749, 18], Comedy: [35, 35], Drama: [18, 18], Family: [10751, 10751], Animation: [16, 16], Action: [28, 10759],
+  Thriller: [53, 80], Horror: [27, 9648], "Sci-Fi": [878, 10765], Crime: [80, 80], Documentary: [99, 99],
+  Halloween: [null, null, "halloween"], Thanksgiving: [null, null, "thanksgiving"], Christmas: [null, null, "christmas"],
+};
+async function keywordId(name: string) {
+  return await cached(`kw:${name}`, 30 * DAY, async () => (await tmdb("/search/keyword", { query: name })).results?.find((k: Any) => k.name.toLowerCase() === name)?.id ?? null);
+}
+async function discover(b: Any) {
+  const kind = b.kind === "series" ? "series" : "movie";
+  const params: Record<string, string | number> = { language: "en-US", include_adult: "false", page: Math.min(20, Math.max(1, Math.floor(Number(b.page) || 1))), watch_region: "US", "vote_count.gte": kind === "movie" ? 80 : 40 };
+  params.sort_by = b.sort === "new" ? (kind === "movie" ? "primary_release_date.desc" : "first_air_date.desc") : b.sort === "top" ? "vote_average.desc" : "popularity.desc";
+  if (b.sort === "new") { params["vote_count.gte"] = 20; params[kind === "movie" ? "primary_release_date.lte" : "first_air_date.lte"] = new Date().toISOString().slice(0, 10); }
+  if (b.sort === "top") params["vote_count.gte"] = kind === "movie" ? 1500 : 400;
+  const g = GENRES[String(b.genre ?? "")];
+  if (g?.[2]) { const k = await keywordId(g[2]); if (k) params.with_keywords = k; }
+  else if (g) { const id = kind === "movie" ? g[0] : g[1]; if (id) params.with_genres = id; }
+  if (kind === "movie" && b.len === "short") params["with_runtime.lte"] = 89;
+  if (kind === "movie" && b.len === "feat") params["with_runtime.gte"] = 90;
+  if (kind === "series" && b.len === "short") params["with_runtime.lte"] = 35;
+  if (kind === "series" && b.len === "hour") params["with_runtime.gte"] = 36;
+  const svcs = (Array.isArray(b.svcs) ? b.svcs : []).map(String);
+  const ids = Object.entries(TMDB_IDS).filter(([, n]) => svcs.includes(n)).map(([i]) => i);
+  if (b.mine && ids.length) { params.with_watch_providers = ids.join("|"); params.with_watch_monetization_types = "flatrate|free|ads"; }
+  const d = await tmdb(kind === "movie" ? "/discover/movie" : "/discover/tv", params);
+  return { results: (d.results ?? []).filter((x: Any) => x.poster_path).map((x: Any) => lite(x, kind)), pages: Math.min(20, d.total_pages ?? 1) };
+}
+
+/* ---------- Fresh this week ---------- */
 const PROVIDERS: Record<string, string> = {
   "Netflix": "8", "Hulu": "15", "Disney+": "337", "Prime Video": "9", "Peacock": "386|387", "HBO Max": "1899",
-  "Paramount+": "531", "Apple TV+": "350", "Tubi": "73", "Pluto TV": "300",
+  "Paramount+": "531", "Apple TV+": "350", "Tubi": "73", "Pluto TV": "300", "Philo": "2383",
 };
 const NETWORKS: Record<string, string> = {
   "Netflix": "213", "Hulu": "453|2|88|19", "Disney+": "2739", "Prime Video": "1024", "Peacock": "3353|6",
@@ -195,20 +336,42 @@ async function fresh(svc: string) {
     ? tmdb("/discover/tv", { with_networks: NETWORKS[svc], language: "en-US", sort_by: "popularity.desc", "air_date.gte": since(8), "air_date.lte": iso(today), without_genres: "10763|10767", "vote_count.gte": 10 })
     : Promise.resolve({ results: [] });
   const [m, t] = await Promise.all([
-    tmdb("/discover/movie", { watch_region: "US", with_watch_providers: p, with_watch_monetization_types: svc === "Tubi" || svc === "Pluto TV" ? "free|ads" : "flatrate", language: "en-US", sort_by: "popularity.desc", "primary_release_date.gte": since(150), "primary_release_date.lte": iso(today), "vote_count.gte": 20 }),
+    tmdb("/discover/movie", { watch_region: "US", with_watch_providers: p, with_watch_monetization_types: ["Tubi", "Pluto TV"].includes(svc) ? "free|ads" : "flatrate", language: "en-US", sort_by: "popularity.desc", "primary_release_date.gte": since(150), "primary_release_date.lte": iso(today), "vote_count.gte": 20 }),
     tvAsk,
   ]);
-  // deno-lint-ignore no-explicit-any
-  const mv = (m.results ?? []).slice(0, 4).map((x: any) => ({ ...lite(x, "movie"), svc, tag: "New movie" }));
-  // deno-lint-ignore no-explicit-any
-  const tv = (t.results ?? []).slice(0, 4).map((x: any) => ({ ...lite(x, "series"), svc, tag: "New episodes" }));
+  const mv = (m.results ?? []).slice(0, 4).map((x: Any) => ({ ...lite(x, "movie"), svc, tag: "New movie" }));
+  const tv = (t.results ?? []).slice(0, 4).map((x: Any) => ({ ...lite(x, "series"), svc, tag: "New episodes" }));
   return [...tv, ...mv];
+}
+
+/* ---------- sharing playlists ---------- */
+async function shareCreate(auth: string, b: Any) {
+  const owner = await userId(auth);
+  if (!owner) return { error: "not_allowed" };
+  const items = (Array.isArray(b.items) ? b.items : []).slice(0, 100);
+  const body = JSON.stringify({ name: String(b.name ?? "Playlist").slice(0, 80), by: String(b.by ?? "").slice(0, 40), items });
+  if (body.length > 400000) return { error: "too_big" };
+  const abc = "abcdefghjkmnpqrstuvwxyz23456789";
+  for (let i = 0; i < 4; i++) {
+    const code = Array.from(crypto.getRandomValues(new Uint8Array(8)), (n) => abc[n % abc.length]).join("");
+    const r = await fetch(`${SB_URL}/rest/v1/vene_shares`, { method: "POST", headers: serviceHeaders(), body: JSON.stringify({ code, owner, data: JSON.parse(body) }) });
+    if (r.ok) return { code };
+    if (r.status !== 409) return { error: "share_unavailable" };
+  }
+  return { error: "share_unavailable" };
+}
+async function shareGet(code: string) {
+  const r = await fetch(`${SB_URL}/rest/v1/vene_shares?code=eq.${encodeURIComponent(code)}&select=data,created_at`, { headers: serviceHeaders() });
+  if (!r.ok) return { error: "share_unavailable" };
+  const rows = await r.json();
+  return rows[0] ? { share: rows[0].data } : { error: "not_found" };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return reply({ error: "POST only" }, 405);
-  if (!(await allowed(req.headers.get("Authorization")))) return reply({ error: "not_allowed" }, 403);
+  const auth = req.headers.get("Authorization");
+  if (!(await allowed(auth))) return reply({ error: "not_allowed" }, 403);
   if (!TMDB_KEY || !WM_KEY) return reply({ error: "missing_keys" }, 500);
   let b: Record<string, unknown>;
   try { b = await req.json(); } catch (_) { return reply({ error: "bad_request" }, 400); }
@@ -218,22 +381,35 @@ Deno.serve(async (req) => {
       case "search": {
         const q = String(b.q ?? "").trim().slice(0, 100);
         if (!q) return reply({ results: [] });
-        return reply({ results: await cached(`search:${q.toLowerCase()}`, DAY, () => search(q)) });
+        return reply({ results: await cached(`search2:${norm(q)}`, DAY, () => search(q)) });
       }
       case "title":
         if (!(id > 0)) return reply({ error: "bad_request" }, 400);
-        return reply({ title: await cached(`title:${kind}:${id}`, 7 * DAY, () => title(kind, id)) });
+        return reply({ title: await cached(`title2:${kind}:${id}`, 7 * DAY, () => title(kind, id)) });
       case "season": {
         const s = Math.floor(Number(b.s));
         if (!(id > 0) || !(s >= 0)) return reply({ error: "bad_request" }, 400);
         return reply({ episodes: await cached(`season:${id}:${s}`, 3 * DAY, () => season(id, s)) });
       }
-      case "fresh": {
-        const svcs = (Array.isArray(b.svcs) ? b.svcs : []).map(String).filter((s) => PROVIDERS[s]).slice(0, 10);
-        const day = new Date().toISOString().slice(0, 10);
-        const lists = await Promise.all(svcs.map((s) => cached(`fresh:${s}:${day}`, DAY / 2, () => fresh(s))));
-        return reply({ fresh: lists });
+      case "people":
+        if (!(id > 0)) return reply({ error: "bad_request" }, 400);
+        return reply({ people: await cached(`people:${kind}:${id}`, 14 * DAY, () => people(kind, id)) });
+      case "person":
+        if (!(id > 0)) return reply({ error: "bad_request" }, 400);
+        return reply({ person: await cached(`person:${id}`, 7 * DAY, () => person(id)) });
+      case "popular_people":
+        return reply({ people: await cached(`popular_people:${new Date().toISOString().slice(0, 10)}`, DAY, popularPeople) });
+      case "discover": {
+        const key = `discover:${JSON.stringify([b.kind, b.genre, b.len, b.sort, b.mine ? (b.svcs as string[] ?? []).slice().sort() : 0, b.page])}`;
+        return reply(await cached(key, DAY / 2, () => discover(b)));
       }
+      case "fresh": {
+        const svcs = (Array.isArray(b.svcs) ? b.svcs : []).map(String).filter((s) => PROVIDERS[s]).slice(0, 12);
+        const day = new Date().toISOString().slice(0, 10);
+        return reply({ fresh: await Promise.all(svcs.map((s) => cached(`fresh:${s}:${day}`, DAY / 2, () => fresh(s)))) });
+      }
+      case "share_create": return reply(await shareCreate(auth!, b));
+      case "share_get": return reply(await shareGet(String(b.code ?? "").slice(0, 20)));
       default:
         return reply({ error: "unknown_action" }, 400);
     }

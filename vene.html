@@ -165,20 +165,33 @@ html.tv .touchonly{display:none!important}
 html.tv .lrow.moving .lcard{transform:scale(1.02);box-shadow:0 0 0 3px #FFB238,0 24px 50px rgba(0,0,0,.55);background:rgba(40,28,34,.96)}
 html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
 .mvb{font-size:18px;font-weight:800}
-/* opening: the line with its two dots comes together into vene. */
-#splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(55% 50% at 50% 45%,rgba(255,150,60,.20) 0%,rgba(255,150,60,.04) 50%,rgba(18,14,20,0) 80%),linear-gradient(180deg,#1A1218 0%,#120E14 60%,#0C090D 100%);transition:opacity 420ms ease}
-#splash svg{width:min(64vw,520px);height:auto;overflow:visible}
-#splash .mv{transition:transform 820ms cubic-bezier(.65,0,.25,1)}
-#splash .w{transition:opacity 500ms ease 250ms}
-#splash .arm{transform-origin:11px 28.75px}
-#splash.open .g{transform:translate(29.2px,-7.75px)} /* the line sits on the logo's visual center (40.2, 21) */
-#splash.open .la{transform:rotate(-57.3deg)}
-#splash.open .ra{transform:rotate(57.3deg)}
-#splash.open .ld{transform:translate(-11.13px,15.9px)}
-#splash.open .rd{transform:translate(11.13px,15.9px)}
-#splash.open .w{opacity:0;transition:none}
-#splash.gone{opacity:0;pointer-events:none}
+/* opening: the line with its two dots folds into the v, then ene. arrives (HTML pieces so the TV's graphics chip animates it) */
+#splash{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:radial-gradient(55% 50% at 50% 45%,rgba(255,150,60,.20) 0%,rgba(255,150,60,.04) 50%,rgba(18,14,20,0) 80%),linear-gradient(180deg,#1A1218 0%,#120E14 60%,#0C090D 100%);animation:vout 420ms ease 2050ms forwards}
+#splash .box{--u:calc(min(64vw,520px) / 96);position:relative;width:calc(var(--u) * 96);height:calc(var(--u) * 36)}
+#splash .pc{position:absolute;will-change:transform;animation:vfold 820ms cubic-bezier(.65,0,.25,1) 450ms both}
+#splash .arm{left:calc(var(--u) * 16.55);top:calc(var(--u) * 23.5);width:calc(var(--u) * 16.98);height:calc(var(--u) * 4.5);border-radius:999px;background:#F6EDE3;transform-origin:calc(var(--u) * 2.25) 50%}
+#splash .la{--c:rotate(-122.74deg);--o:translate(calc(var(--u) * 29.2),calc(var(--u) * -7.75)) rotate(-180deg)}
+#splash .ra{--c:rotate(-57.26deg);--o:translate(calc(var(--u) * 29.2),calc(var(--u) * -7.75)) rotate(0deg)}
+#splash .dot{width:calc(var(--u) * 3.6);height:calc(var(--u) * 3.6);border-radius:50%;background:#FFB238;top:calc(var(--u) * 8.05)}
+#splash .ld{left:calc(var(--u) * 10.25);--c:translate(0,0);--o:translate(calc(var(--u) * 18.07),calc(var(--u) * 8.15))}
+#splash .rd{left:calc(var(--u) * 23.75);--c:translate(0,0);--o:translate(calc(var(--u) * 40.33),calc(var(--u) * 8.15))}
+#splash .word{position:absolute;inset:0;width:100%;height:100%;overflow:visible;animation:vin 500ms ease 950ms both}
+@keyframes vfold{from{transform:var(--o)}to{transform:var(--c)}}
+@keyframes vin{from{opacity:0}to{opacity:1}}
+@keyframes vout{to{opacity:0;visibility:hidden}}
+#splash.skip{display:none}
 @media (prefers-reduced-motion:reduce){#splash{display:none}}
+/* phone: while typing, the search field gets the whole top bar */
+@media (max-width:760px){
+  .search input{font-size:16px}
+  header.top:focus-within .logo-a,header.top:focus-within [data-addlink],header.top:focus-within .me,header.top:focus-within [data-back]{display:none!important}
+  header.top:focus-within .search{flex:1}
+}
+/* TV: lighter drawing for the Fire TV Stick (blur and full-screen texture are slow there) */
+html.tv .warm{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(40,28,34,.92)}
+html.tv body::after{display:none}
+html.tv body{background-attachment:scroll;transition:none}
+html.tv *{scroll-behavior:auto}
 /* phone */
 @media (max-width:760px){
   #app{padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px))}
@@ -198,17 +211,15 @@ html.tv .lrow.moving .mvb{background:#FFB238;color:#24160A}
 </style>
 </head>
 <body>
-<div id="splash" class="open" aria-hidden="true"><svg viewBox="-7.8 3 96 36"><g class="mv g"><g class="mv arm la"><path d="M11 28.75L4.25 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv arm ra"><path d="M11 28.75L17.75 18.25" fill="none" stroke="#F6EDE3" stroke-width="4.5" stroke-linecap="round"/></g><g class="mv ld"><circle cx="4.25" cy="12.85" r="1.8" fill="#FFB238"/></g><g class="mv rd"><circle cx="17.75" cy="12.85" r="1.8" fill="#FFB238"/></g></g><text class="w" x="21.5" y="31" font-family="Nunito, system-ui, sans-serif" font-weight="800" font-size="31" letter-spacing="-0.6" fill="#F6EDE3">ene.</text></svg></div>
-<script>(function () { // play once each time vene is opened (not on its own reloads)
+<div id="splash" aria-hidden="true"><div class="box"><span class="pc arm la"></span><span class="pc arm ra"></span><span class="pc dot ld"></span><span class="pc dot rd"></span><svg class="word" viewBox="-7.8 3 96 36"><text x="21.5" y="31" font-family="Nunito, system-ui, sans-serif" font-weight="800" font-size="31" letter-spacing="-0.6" fill="#F6EDE3">ene.</text></svg></div></div>
+<script>(function () { // plays once each time vene is opened; the animation ends itself even if the page is busy
   const s = document.getElementById("splash"); let seen = null;
   try { seen = sessionStorage.getItem("vene.opened"); sessionStorage.setItem("vene.opened", "1"); } catch (e) {}
-  if (seen) { s.remove(); return; }
-  const done = () => { s.classList.add("gone"); setTimeout(() => s.remove(), 450); };
-  s.addEventListener("click", done);
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    setTimeout(() => s.classList.remove("open"), 450);
-    setTimeout(done, 2050);
-  }));
+  const gone = () => { if (s.parentNode) s.remove(); };
+  if (seen) { gone(); return; }
+  s.addEventListener("click", () => s.classList.add("skip"));
+  document.addEventListener("keydown", () => s.classList.add("skip"), { once: true });
+  setTimeout(gone, 2600);
 })();</script>
 <nav id="rail" class="warm" aria-label="Main"></nav>
 <main id="app"></main>
@@ -235,12 +246,14 @@ const SVC = {
   "Apple TV+": { t: "tv", c: "#CFC6C0", f: "#1A1216", q: "https://tv.apple.com/search?term=" },
   "YouTube": { t: "YT", c: "#FF3B30", f: "#fff", q: "https://www.youtube.com/results?search_query=" },
   "Tubi": { t: "Tu", c: "#FFB000", f: "#1A1216", q: "https://tubitv.com/search/" },
-  "Pluto TV": { t: "Pl", c: "#FFE14D", f: "#1A1216", q: null },
+  "Pluto TV": { t: "Pl", c: "#FFE14D", f: "#1A1216", q: "https://pluto.tv/search/details?query=" },
+  "Philo": { t: "Ph", c: "#7C8CFF", f: "#fff", q: "https://www.philo.com/player/search?q=" },
+  "STARZ": { t: "S", c: "#D9D2CC", f: "#1A1216", q: "https://www.starz.com/us/en/search?q=" },
   "Plex": { t: "Px", c: "#E5A00D", f: "#1A1216", q: null }
 };
-const SUBS = ["Netflix", "Hulu", "Disney+", "Prime Video", "Peacock", "HBO Max", "Paramount+", "Apple TV+"];
+const SUBS = ["Netflix", "Hulu", "Disney+", "Prime Video", "Peacock", "HBO Max", "Paramount+", "Apple TV+", "STARZ", "Philo"];
 const FREE = ["YouTube", "Tubi", "Pluto TV", "Plex"];
-const VIAOPT = { "HBO Max": ["Hulu", "Prime Video"], "Peacock": ["Prime Video"], "Hulu": ["Disney+"], "Paramount+": ["Prime Video"] };
+const VIAOPT = { "HBO Max": ["Hulu", "Prime Video"], "Peacock": ["Prime Video"], "Hulu": ["Disney+"], "Paramount+": ["Prime Video"], "STARZ": ["Hulu", "Prime Video"] };
 const STORES = { "Apple TV": "https://tv.apple.com/search?term=", "Prime Video": "https://www.primevideo.com/search?phrase=", "Fandango at Home": "https://athome.fandango.com/content/browse/search?searchString=", "Google TV": "https://play.google.com/store/search?c=movies&q=" };
 const THEMES = ["Halloween", "Thanksgiving", "Christmas", "Romance", "Family", "Thriller"];
 
@@ -281,7 +294,7 @@ function pick(srcs) {
   const ok = srcs.filter(s => !BROKEN(s));
   return ok.find(yours) || ok.find(s => s.free && ST.sv.includes(s.svc)) || ok.find(s => s.free) || srcs.find(yours) || null;
 }
-const HOSTS = [["hulu.com", "Hulu"], ["disneyplus.com", "Disney+"], ["netflix.com", "Netflix"], ["primevideo.com", "Prime Video"], ["amazon.com", "Prime Video"], ["peacocktv.com", "Peacock"], ["hbomax.com", "HBO Max"], ["max.com", "HBO Max"], ["paramountplus.com", "Paramount+"], ["tv.apple.com", "Apple TV+"], ["youtube.com", "YouTube"], ["youtu.be", "YouTube"], ["tubitv.com", "Tubi"], ["pluto.tv", "Pluto TV"], ["plex.tv", "Plex"]];
+const HOSTS = [["hulu.com", "Hulu"], ["disneyplus.com", "Disney+"], ["netflix.com", "Netflix"], ["primevideo.com", "Prime Video"], ["amazon.com", "Prime Video"], ["peacocktv.com", "Peacock"], ["hbomax.com", "HBO Max"], ["max.com", "HBO Max"], ["paramountplus.com", "Paramount+"], ["tv.apple.com", "Apple TV+"], ["youtube.com", "YouTube"], ["youtu.be", "YouTube"], ["tubitv.com", "Tubi"], ["pluto.tv", "Pluto TV"], ["plex.tv", "Plex"], ["philo.com", "Philo"], ["starz.com", "STARZ"]];
 const hostSvc = u => { try { const h = new URL(u).hostname; const m = HOSTS.find(([d]) => h === d || h.endsWith("." + d)); return m ? m[1] : null; } catch (e) { return null; } };
 const linkOf = id => ST.links[id] || (D.links || {})[id] || null;
 const extractUrl = t => { const m = String(t || "").match(/https:\/\/[^\s"'<>]+/); return m ? m[0].replace(/[).,]+$/, "") : null; };
@@ -303,7 +316,7 @@ function target(it) {
   if (BROKEN(s) && s.svc === "Pluto TV") return { n: "Pluto TV", u: s.u, mine: !!p, svc: "Pluto TV" };
   if (BROKEN(s)) return { n: "Paramount+", u: "https://www.paramountplus.com/", mine: !!p, svc: "Paramount+", copy: base.title, openApp: true };
   if (it.kind === "episode") return { n: app, u: SVC[app] && SVC[app].q ? SVC[app].q + q : s.u, mine: !!p, search: true, svc: s.svc };
-  return { n: s.via ? s.svc + " in " + s.via : s.svc, u: s.u, mine: !!p, svc: s.svc };
+  return { n: s.via ? s.svc + " in " + s.via : s.svc, u: s.u, mine: !!p, svc: s.svc, search: !!s.search };
 }
 const playLabel = t => t.openApp ? "Open Paramount+" : t.exact ? "Play on " + t.n : t.owned ? "Play from " + t.n : t.check ? "Check " + t.n : t.rent ? "Rent or buy on " + t.n : t.search ? "Find in " + t.n : "Play on " + t.n;
 const svcColor = t => (SVC[t.svc] || SVC[t.n] || { c: "#9C8C8A" }).c;
@@ -318,8 +331,8 @@ const NAV = [["home", "Home", '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H
 function route() { let h = location.hash.slice(1); try { h = decodeURIComponent(h); } catch (e) {} h = h || "home"; const [v, ...r] = h.split(":"); return { v, arg: r.join(":") }; }
 const go = h => { location.hash = h; };
 function header() {
-  const inner = ["t", "pl", "services", "search", "link"].includes(route().v);
-  return `<header class="top">${inner ? `<button class="ib" data-back="1" aria-label="Back" style="width:44px;height:44px">${'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>'}</button>` : ""}${LOGO(34)}<label class="search warm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search movies, shows, episodes" aria-label="Search" value="${esc(route().v === "search" ? route().arg : "")}"></label><button class="ib" data-addlink="1" aria-label="Add an episode link you copied" title="Add an episode link you copied" style="width:44px;height:44px;margin-left:auto"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button><button class="me" style="margin-left:0" data-go="services" aria-label="Profile and My Services"><b>${esc(ST.name || (SYNC.user ? SYNC.user.email.split("@")[0] : "Sign in"))}</b><span class="avatar"></span></button></header>`;
+  const inner = ["t", "pl", "services", "search", "link", "p", "share"].includes(route().v);
+  return `<header class="top">${inner ? `<button class="ib" data-back="1" aria-label="Back" style="width:44px;height:44px">${'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>'}</button>` : ""}<span class="logo-a" style="display:flex">${LOGO(34)}</span><label class="search warm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" placeholder="Search movies, shows, episodes" aria-label="Search" value="${esc(route().v === "search" ? route().arg : "")}"></label><button class="ib" data-addlink="1" aria-label="Add an episode link you copied" title="Add an episode link you copied" style="width:44px;height:44px;margin-left:auto"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></button><button class="me" style="margin-left:0" data-go="services" aria-label="Profile and My Services"><b>${esc(ST.name || (SYNC.user ? SYNC.user.email.split("@")[0] : "Sign in"))}</b><span class="avatar"></span></button></header>`;
 }
 
 /* ---------- home ---------- */
@@ -418,7 +431,7 @@ function titlePage(id) {
   const it = BY[id] || idFromRoute(id); if (!it) return home();
   const sh0 = showOf(it);
   if (String(id).startsWith("tm:")) keepItem(id);
-  if (sh0 && sh0.tmdb && !sh0.full && !(CUR[(sh0.kind === "movie" ? "m" : "s") + sh0.tmdb] && (sh0.kind === "movie" || sh0.seasons))) {
+  if (sh0 && sh0.tmdb && !sh0.full && !sh0.refreshed) {
     needFull(sh0).then(r => { if (route().v === "t" && route().arg === id) { const y = scrollY; render(); scrollTo(0, y); if (r && r.error && $("wtw")) $("wtw").insertAdjacentHTML("beforeend", `<p class="mute" style="margin:6px 0">${netMsg(r.error)}</p>`); } });
   }
   const base = showOf(it), t = target(it), ep = it.kind === "episode", ser = it.kind === "series";
@@ -455,7 +468,9 @@ function titlePage(id) {
     const eps = EPS(shw.id);
     if (eps.length) h += `<h2 class="sec">Episodes in vene <small>${esc(shw.title)}</small></h2><div class="row">${eps.map(posterCard).join("")}</div>`;
   }
+  if (sh0 && sh0.tmdb) h += `<div id="people"></div>`;
   $("app").innerHTML = h;
+  fillPeople(it);
   if ($("eplist")) { const [sid, sn] = $("eplist").dataset.for.split("|"); fillSeason(BY[sid], +sn); }
 }
 
@@ -472,7 +487,7 @@ function playlistPage(id) {
   let h = header();
   h += `<div class="plwrap"><aside>${coverHTML(p, 290)}<div class="pinfo"><h1 class="disp" style="margin:6px 0 0;font-size:44px;line-height:.95;font-weight:800;letter-spacing:-.035em">${esc(p.name)}</h1><span style="display:flex;align-items:center;gap:10px"><span class="dots">${svcDots(p)}</span><span style="color:var(--soft)">${items.length} titles · about ${fmtMin(mins)}</span></span>
     <div style="display:flex;gap:10px;flex-wrap:wrap">${items.length ? `${keepLink(p, 'class="btnp"', `<i>${svgPlay(14, "#FFB238")}</i>${done >= 0 ? "Keep watching" : "Play from the top"}`)}<button class="btng warm" data-pickfor="${p.id}">${svgDie(19)}Pick for me</button>` : ""}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="chip${edit ? " on" : ""}" data-edit="${p.id}">${edit ? "Done" : "Edit"}</button><span class="mute touchonly" style="font-size:12px;align-self:center;flex-basis:100%">Press and hold a title to move it.</span><span class="mute tvonly" style="font-size:14px;align-self:center;flex-basis:100%">${tvMove && tvMove.pid === p.id ? "Use up and down to move it. Press select when it's in place." : "To change the order, select ⇅ next to a title."}</span><button class="chip" data-rename="${p.id}">Rename</button>${done >= 0 ? `<button class="chip" data-reset="${p.id}">Start over</button>` : ""}${edit ? `<button class="chip" data-delpl="${p.id}">Delete playlist</button>` : ""}</div></div></aside>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="chip${edit ? " on" : ""}" data-edit="${p.id}">${edit ? "Done" : "Edit"}</button><span class="mute touchonly" style="font-size:12px;align-self:center;flex-basis:100%">Press and hold a title to move it.</span><span class="mute tvonly" style="font-size:14px;align-self:center;flex-basis:100%">${tvMove && tvMove.pid === p.id ? "Use up and down to move it. Press select when it's in place." : "To change the order, select ⇅ next to a title."}</span><button class="chip" data-rename="${p.id}">Rename</button><button class="chip" data-share="${p.id}">Share</button>${done >= 0 ? `<button class="chip" data-reset="${p.id}">Start over</button>` : ""}${edit ? `<button class="chip" data-delpl="${p.id}">Delete playlist</button>` : ""}</div></div></aside>
     <ol class="lineup" style="flex:1;min-width:0;margin-top:8px;width:100%">${items.length > 1 ? `<div class="vl" style="background:linear-gradient(180deg,#FFB238 0%,#FFB238 ${Math.max(0, (done + .5) / (items.length - 1) * 100)}%,rgba(246,237,227,.28) ${Math.max(0, (done + .5) / (items.length - 1) * 100) + 5}%,rgba(246,237,227,.28) 100%)"></div>` : ""}` +
     items.map((it, j) => { const t = target(it), c = svcColor(t), on = j === sel, sv = SVC[t.svc] || SVC[t.n] || { t: "", f: "#fff" };
       return `<li class="lrow${tvMove && tvMove.pid === p.id && tvMove.j === j ? " moving" : ""}" data-row="${p.id}|${j}" style="opacity:${j <= done && !on ? .55 : 1}"><span class="nodewrap"><span class="node" data-c="${c}" data-t="${esc(sv.t)}" data-f="${sv.f}" style="${on ? `width:34px;height:34px;background:${c};color:${sv.f};box-shadow:0 0 0 5px rgba(255,178,56,.35)` : `width:16px;height:16px;background:${c}`}">${on ? esc(sv.t) : ""}</span></span>
@@ -488,19 +503,107 @@ function playlistsPage() {
 }
 
 /* ---------- browse, library, search ---------- */
-let bTheme = "", bKind = "all", bLen = "";
-const LENS = [["", "Any length"], ["short", "About 22 min"], ["hour", "About an hour"], ["feat", "Feature length"]];
-const lenOk = x => !bLen || (x.kind !== "series" && x.min && (bLen === "short" ? x.min <= 30 : bLen === "hour" ? x.min > 30 && x.min <= 70 : x.min >= 75));
+let bTheme = "", bKind = "movie", bLen = "", bSort = "popular", bMine = true;
+const GENRE_CHIPS = ["Romance", "Comedy", "Drama", "Family", "Animation", "Action", "Thriller", "Horror", "Sci-Fi", "Crime", "Documentary", "Halloween", "Thanksgiving", "Christmas"];
+const lenChips = () => bKind === "series" ? [["", "Any length"], ["short", "About 30 min"], ["hour", "About an hour"]] : [["", "Any length"], ["short", "Under 90 min"], ["feat", "Feature length"]];
+let bPages = { key: "", page: 0, pages: 1, items: [] };
 function browsePage() {
   document.body.style.removeProperty("--bg");
-  const kindOk = x => bKind === "all" ? x.kind !== "episode" || bLen === "short" || bLen === "hour" : bKind === "movies" ? x.kind === "movie" : bKind === "shows" ? x.kind === "series" : x.kind === "episode";
-  const themeOk = x => !bTheme || (x.kind === "series" ? EPS(x.id).some(e => e.themes.includes(bTheme)) : (x.themes || []).includes(bTheme));
-  const list = D.items.filter(x => kindOk(x) && themeOk(x) && lenOk(x));
   const chips = (arr, cur, key) => arr.map(([v, l]) => `<button class="chip${cur === v ? " on" : ""}" data-${key}="${v}">${l}</button>`).join("");
-  $("app").innerHTML = header() + `<h1 class="disp" style="margin:6px 0 14px;font-size:40px;font-weight:800;letter-spacing:-.03em">Browse</h1>
-  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:22px"><div style="display:flex;gap:8px;flex-wrap:wrap">${chips([["all", "Everything"], ["movies", "Movies"], ["shows", "Shows"], ["episodes", "Episodes"]], bKind, "kind")}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${chips(LENS, bLen, "len")}</div><div style="display:flex;gap:8px;flex-wrap:wrap">${chips([["", "All themes"], ...THEMES.map(t => [t, t])], bTheme, "theme")}</div></div>
-  ${list.length ? `<div class="grid">${list.map(posterCard).join("")}</div>` : `<div class="empty">Nothing matches those filters yet.</div>`}`;
+  let h = header() + `<h1 class="disp" style="margin:6px 0 14px;font-size:40px;font-weight:800;letter-spacing:-.03em">Browse</h1>`;
+  h += `<div id="essrow"></div>`;
+  h += `<div style="display:flex;flex-direction:column;gap:10px;margin:8px 0 22px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${chips([["movie", "Movies"], ["series", "Shows"]], bKind, "kind")}<span style="width:12px"></span>${chips([["popular", "Popular"], ["new", "Newest"], ["top", "Top rated"]], bSort, "bsort")}<span style="width:12px"></span><button class="chip${bMine ? " on" : ""}" data-bmine="1">${bMine ? "✓ " : ""}On my services</button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${chips([["", "All genres"], ...GENRE_CHIPS.map(g => [g, g])], bTheme, "theme")}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${chips(lenChips(), bLen, "len")}</div></div>
+  <div id="bgrid" class="grid"><div class="empty" style="grid-column:1/-1">Loading…</div></div><div id="bmore" style="display:flex;justify-content:center;margin:22px 0"></div>`;
+  $("app").innerHTML = h;
+  fillEssentials(); browseLoad(false);
 }
+async function browseLoad(more) {
+  const key = JSON.stringify([bKind, bTheme, bLen, bSort, bMine, ST.sv]);
+  if (!more || bPages.key !== key) bPages = { key, page: 0, pages: 1, items: [] };
+  const grid = $("bgrid"); if (!grid) return;
+  if (!SYNC.user) { grid.innerHTML = `<div class="empty" style="grid-column:1/-1">${netMsg("signin")}</div>`; return; }
+  if (bPages.page >= bPages.pages) return;
+  const r = await net("discover", { kind: bKind, genre: bTheme, len: bLen, sort: bSort, mine: bMine, svcs: ST.sv, page: bPages.page + 1 });
+  if (bPages.key !== key || !$("bgrid")) return;
+  if (r.error) { $("bgrid").innerHTML = `<div class="empty" style="grid-column:1/-1">${netMsg(r.error)}</div>`; return; }
+  bPages.page++; bPages.pages = r.pages || 1;
+  const add = (r.results || []).map(fromNet).filter(x => !bPages.items.includes(x));
+  bPages.items.push(...add);
+  $("bgrid").innerHTML = bPages.items.length ? bPages.items.map(posterCard).join("") : `<div class="empty" style="grid-column:1/-1">Nothing matches those filters yet.</div>`;
+  $("bmore").innerHTML = bPages.page < bPages.pages ? `<button class="btng warm" data-bmore="1">Show more</button>` : "";
+}
+
+/* ---------- Essentials: playlists built around a person, like Apple Music ---------- */
+async function forYouPeople() { // people who show up most in your playlists and Library
+  const ids = [...new Set([...ST.lib, ...ST.pls.flatMap(p => p.items)])].map(id => BY[id]).filter(Boolean).map(showOf).filter(x => x && x.tmdb);
+  const uniq = [...new Map(ids.map(x => [x.kind + x.tmdb, x])).values()].slice(-10);
+  const lists = await Promise.all(uniq.map(x => net("people", { kind: x.kind, id: x.tmdb })));
+  const count = new Map();
+  lists.forEach(r => (r.people || []).slice(0, 5).forEach((p, i) => { const c = count.get(p.id) || { p, n: 0 }; c.n += i === 0 ? 1.5 : 1; count.set(p.id, c); }));
+  return [...count.values()].filter(c => c.n >= 2).sort((a, b) => b.n - a.n).slice(0, 8).map(c => c.p);
+}
+const essCard = p => `<a class="pl" href="#p:${p.id}"><span class="cover" style="width:150px;height:150px;border-radius:18px;display:block;position:relative;overflow:hidden;background:#2A1C24 center/cover;${bgUrl(p.img)}"><span style="position:absolute;inset:auto 0 0 0;padding:26px 10px 9px;background:linear-gradient(180deg,transparent,rgba(12,9,13,.92));font:800 12px var(--body);letter-spacing:.1em;text-transform:uppercase;color:#FFCB7A">Essentials</span></span><span style="display:flex;flex-direction:column;gap:2px;max-width:150px"><b class="disp" style="font-size:15px;line-height:1.15">${esc(p.name)}</b><span class="mute" style="font-size:12px">${esc(p.role && p.role !== "Cast" ? p.role : "Essentials")}</span></span></a>`;
+async function fillEssentials() {
+  const box = $("essrow"); if (!box || !SYNC.user) return;
+  const [mine, pop] = await Promise.all([forYouPeople(), net("popular_people", {})]);
+  const b = $("essrow"); if (!b) return;
+  let h = "";
+  if (mine.length) h += `<h2 class="sec">Essentials for you <small>from your playlists and Library</small></h2><div class="row">${mine.map(essCard).join("")}</div>`;
+  const popular = (pop.people || []).filter(p => !mine.some(m => m.id === p.id));
+  if (popular.length) h += `<h2 class="sec">Popular Essentials</h2><div class="row">${popular.map(essCard).join("")}</div>`;
+  b.innerHTML = h;
+}
+function personPage(pid) {
+  document.body.style.removeProperty("--bg");
+  $("app").innerHTML = header() + `<div id="person"><div class="empty">Loading…</div></div>`;
+  net("person", { id: +pid }).then(r => {
+    const box = $("person"); if (!box || route().arg !== pid) return;
+    if (!r.person) { box.innerHTML = `<div class="empty">${netMsg(r.error)}</div>`; return; }
+    const P = r.person, items = P.items.map(fromNet), have = ST.pls.find(p => p.ess === +pid);
+    box.innerHTML = `<section class="titlehead" style="display:flex;gap:30px;align-items:flex-end;margin:8px 0 26px"><span style="width:200px;height:200px;flex:none;border-radius:24px;background:#2A1C24 center/cover;${bgUrl(P.img)};box-shadow:0 30px 60px rgba(0,0,0,.55)"></span><div style="display:flex;flex-direction:column;gap:10px"><span style="font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--amber)">Essentials</span><h1 class="disp" style="margin:0;font-size:clamp(34px,5vw,56px);line-height:.95;font-weight:800;letter-spacing:-.035em">${esc(P.name)}</h1><span class="mute">${items.length} titles · ${esc(P.dept === "Directing" ? "as director or creator" : "the roles people know them for")}</span><div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px">${have ? `<a class="btnp" href="#pl:${esc(have.id)}"><i>${svgPlay(14, "#FFB238")}</i>In your playlists</a>` : `<button class="btnp" data-addess="${esc(pid)}"><i>${svgPlus(14)}</i>Add as a playlist</button>`}</div></div></section><div class="grid">${items.map(posterCard).join("")}</div>`;
+    window.__ess = { pid: +pid, name: P.name + " Essentials", items };
+    tvFocus();
+  });
+}
+async function fillPeople(it) {
+  const box = $("people"), sh = showOf(it); if (!box || !sh || !sh.tmdb) return;
+  const r = await net("people", { kind: sh.kind, id: sh.tmdb });
+  const b = $("people"); if (!b || !r.people || !r.people.length) return;
+  b.innerHTML = `<h2 class="sec">Essentials <small>people in ${esc(sh.title)}</small></h2><div class="row">${r.people.map(essCard).join("")}</div>`;
+}
+
+/* ---------- sharing a playlist ---------- */
+const slimItem = it => { const o = {}; ["id", "kind", "tmdb", "title", "year", "img", "bg", "ov", "min", "series", "s", "e", "src", "buy", "checked", "seasons"].forEach(k => { if (it[k] != null) o[k] = it[k]; }); return o; };
+async function sharePlaylist(pid) {
+  const p = plOf(pid); if (!p) return;
+  const items = p.items.map(id => BY[id]).filter(Boolean);
+  const extra = items.filter(x => x.kind === "episode" && BY[x.series] && String(x.series).startsWith("tm:")).map(x => BY[x.series]);
+  toast("Making a share link…");
+  const r = await net("share_create", { name: p.name, by: ST.name || "", items: [...items, ...extra].map(slimItem), order: p.items });
+  if (!r.code) { toast(r.error === "share_unavailable" ? "Sharing isn't set up in Supabase yet" : "Couldn't make a share link"); return; }
+  const url = location.origin + location.pathname + "#share:" + r.code;
+  try { if (navigator.share) { await navigator.share({ title: p.name + " on vene", text: (ST.name ? ST.name + " shared " : "") + p.name + " on vene", url }); return; } } catch (e) { if (e && e.name === "AbortError") return; }
+  try { await navigator.clipboard.writeText(url); toast("Link copied. Send it to anyone on the vene family list"); } catch (e) { window.prompt("Copy this link", url); }
+}
+function sharePage(code) {
+  document.body.style.removeProperty("--bg");
+  $("app").innerHTML = header() + `<div id="shared"><div class="empty">Opening the shared playlist…</div></div>`;
+  net("share_get", { code }).then(r => {
+    const box = $("shared"); if (!box || route().arg !== code) return;
+    if (!r.share) { box.innerHTML = `<div class="empty">${r.error === "not_found" ? "That share link doesn't work anymore." : netMsg(r.error)}</div>`; return; }
+    const S = r.share, order = S.order || S.items.map(x => x.id);
+    S.items.forEach(x => { if (x && x.id && !BY[x.id]) BY[x.id] = Object.assign({ themes: [] }, x); });
+    const items = order.map(id => BY[id]).filter(Boolean);
+    window.__share = { code, name: S.name, ids: items.map(x => x.id) };
+    const fake = { id: "share", name: S.name, items: items.map(x => x.id) };
+    box.innerHTML = `<section class="titlehead" style="display:flex;gap:30px;align-items:flex-end;margin:8px 0 26px">${coverHTML(fake, 220)}<div style="display:flex;flex-direction:column;gap:10px"><span style="font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--amber)">Shared playlist${S.by ? " · from " + esc(S.by) : ""}</span><h1 class="disp" style="margin:0;font-size:clamp(34px,5vw,56px);line-height:.95;font-weight:800;letter-spacing:-.035em">${esc(S.name)}</h1><span class="mute">${items.length} titles</span><div><button class="btnp" data-addshare="1"><i>${svgPlus(14)}</i>Add to my playlists</button></div></div></section><div class="grid">${items.map(posterCard).join("")}</div>`;
+    tvFocus();
+  });
+}
+
 function libraryPage() {
   document.body.style.removeProperty("--bg");
   const list = ST.lib.map(id => BY[id]).filter(Boolean);
@@ -664,7 +767,7 @@ function fromNet(x) { // TMDB answer -> a vene item (the starter catalog's own c
   const k = (x.kind === "movie" ? "m" : "s") + x.tmdb, id = CUR[k] || "tm:" + k;
   const it = BY[id] || (BY[id] = { id, themes: [] });
   if (!CUR[k]) Object.assign(it, x, { id, themes: it.themes || [] });
-  else if (x.seasons) it.seasons = x.seasons;
+  else { if (x.seasons) it.seasons = x.seasons; if (x.src) { it.src = x.src; it.buy = x.buy || it.buy; it.checked = x.checked; it.refreshed = true; } }
   if (x.src && !CUR[k]) it.full = true;
   return it;
 }
@@ -684,7 +787,7 @@ function keepItem(id) { // remember online titles that are saved, playlisted or 
 }
 async function needFull(it) { // where to watch + details for an online title (or seasons for a starter show)
   if (!it || !it.tmdb || it.kind === "episode") return;
-  if (it.full || (CUR[(it.kind === "movie" ? "m" : "s") + it.tmdb] && (it.kind === "movie" || it.seasons))) return;
+  if (it.full || it.refreshed) return;
   const r = await net("title", { kind: it.kind, id: it.tmdb });
   if (r.title) { fromNet(r.title); if (it.id.startsWith("tm:")) { it.full = true; keepItem(it.id); save(); } }
   return r;
@@ -865,7 +968,7 @@ function render() {
   const { v, arg } = route();
   if (v !== "home") { clearTimeout(heroA); clearTimeout(heroB); }
   rail(v);
-  if (v === "t") titlePage(arg); else if (v === "pl") playlistPage(arg); else if (v === "playlists") playlistsPage(); else if (v === "browse") browsePage(); else if (v === "library") libraryPage(); else if (v === "search") searchPage(arg); else if (v === "services") servicesPage(); else if (v === "link") linkPage(arg); else home();
+  if (v === "t") titlePage(arg); else if (v === "pl") playlistPage(arg); else if (v === "playlists") playlistsPage(); else if (v === "browse") browsePage(); else if (v === "library") libraryPage(); else if (v === "search") searchPage(arg); else if (v === "services") servicesPage(); else if (v === "link") linkPage(arg); else if (v === "p") personPage(arg); else if (v === "share") sharePage(arg); else home();
 }
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0, 0); tvFocus(); });
 window.addEventListener("resize", () => { if (route().v === "home") placeSquares(); });
@@ -890,7 +993,7 @@ document.addEventListener("click", e => {
   const d = b.dataset;
   if (d.go) return go(d.go);
   if (d.back) { if (history.length > 1) history.back(); else go("home"); return; }
-  if (d.addlink) { readClip().then(u => { if (u && hostSvc(u)) go("link:" + encodeURIComponent(u)); else { if (route().v !== "link") go("link:"); toast(u ? "That link isn't from a streaming app vene knows" : "Copy an episode link first, or paste it below"); } }); return; }
+  if (d.addlink) { readClip().then(u => { const sm = u && u.match(/#share:([a-z0-9]{6,12})/); if (sm) return go("share:" + sm[1]); if (u && hostSvc(u)) go("link:" + encodeURIComponent(u)); else { if (route().v !== "link") go("link:"); toast(u ? "That link isn't from a streaming app vene knows" : "Copy an episode link first, or paste it below"); } }); return; }
   if (d.pastefor) { const id = d.pastefor; readClip().then(u => { if (u && hostSvc(u)) { ST.links[id] = u; save(); toast("Saved. Play opens this exact episode"); render(); } else toast(u ? "That link isn't from a streaming app vene knows" : "Copy the episode link first, or paste it in the box"); }); return; }
   if (d.linkto) { ST.links[d.linkto] = d.u; save(); toast("Linked " + BY[d.linkto].title); return go("t:" + d.linkto); }
   if (d.sharelinks) { const out = {}; Object.keys(ST.links).forEach(id => { if (BY[id]) out[id] = ST.links[id]; }); const lines = Object.keys(out).map(id => "# " + nameOf(BY[id])).join("\n"); const txt = "vene episode links\n" + lines + "\n" + JSON.stringify(out); try { navigator.clipboard.writeText(txt).then(() => toast("Copied. Paste it to Claude to share with everyone"), () => { window.prompt("Copy these links", txt); }); } catch (er) { window.prompt("Copy these links", txt); } return; }
@@ -906,6 +1009,12 @@ document.addEventListener("click", e => {
   if (d.authback) { SYNC.step = null; SYNC.err = ""; return refreshAccount(); }
   if (d.renameMe) { const n = window.prompt("Your name", ST.name || ""); if (n && n.trim()) { ST.name = n.trim(); save(); render(); } return; }
   if (d.season) { const [sid, sn] = d.season.split("|"); seasonSel[sid] = +sn; document.querySelectorAll("[data-season]").forEach(c => c.classList.toggle("on", c === b)); const box = $("eplist"); if (box) { box.dataset.for = sid + "|" + sn; box.innerHTML = `<div class="empty">Loading season ${sn}…</div>`; fillSeason(BY[sid], +sn); } return; }
+  if (d.bmore) { browseLoad(true); return; }
+  if (d.bsort != null) { bSort = d.bsort; return render(); }
+  if (d.bmine) { bMine = !bMine; return render(); }
+  if (d.share) { sharePlaylist(d.share); return; }
+  if (d.addess) { const E = window.__ess; if (!E || E.pid !== +d.addess) return; E.items.forEach(x => keepItem(x.id)); const p = { id: newId(), name: E.name, items: E.items.map(x => x.id), ess: E.pid }; ST.pls.push(p); save(); toast("Added " + E.name); return go("pl:" + p.id); }
+  if (d.addshare) { const S = window.__share; if (!S) return; S.ids.forEach(keepItem); const p = { id: newId(), name: S.name, items: S.ids.slice() }; ST.pls.push(p); save(); toast("Added " + S.name + " to your playlists"); return go("pl:" + p.id); }
   if (d.hulu) { VeneTV.setHulu(+d.hulu); toast("Hulu will open with way " + d.hulu); render(); const c = document.querySelector(`[data-hulu="${d.hulu}"]`); if (c) c.focus(); return; }
   if (d.tvmove) { const [pid, j] = d.tvmove.split("|"); tvMove = { pid, j: +j }; render(); const b = document.querySelector(`[data-tvmove="${pid}|${j}"]`); if (b) b.focus(); return; }
   if (d.mv) { const [pid, j, dir] = d.mv.split("|"); const p = plOf(pid), i = +j, k = i + +dir; if (k < 0 || k >= p.items.length) return; [p.items[i], p.items[k]] = [p.items[k], p.items[i]]; threadSel[pid] = k; save(); return render(); }
@@ -924,7 +1033,7 @@ document.addEventListener("click", e => {
   if (d.sv) { const i = ST.sv.indexOf(d.sv); if (i > -1) ST.sv.splice(i, 1); else ST.sv.push(d.sv); save(); return render(); }
   if (d.via) { const [n, x] = d.via.split("|"); if (x) ST.via[n] = x; else delete ST.via[n]; save(); toast(x ? n + " will open in " + x : n + " will open in its own app"); return render(); }
   if (d.theme != null) { bTheme = d.theme; return render(); }
-  if (d.kind != null) { bKind = d.kind; return render(); }
+  if (d.kind != null) { bKind = d.kind; bLen = ""; return render(); }
   if (d.len != null) { bLen = d.len; return render(); }
 });
 render();
