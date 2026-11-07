@@ -122,8 +122,6 @@ function wmService(name: string, type: string): [string, string | null] | null {
     if (n.startsWith("peacock")) return ["Peacock", null];
     if (n.startsWith("prime video") || n.includes("freevee")) return ["Prime Video", null];
     if (n.startsWith("philo")) return ["Philo", null];
-    if (n.startsWith("kanopy")) return ["Kanopy", null];
-    if (n.startsWith("hoopla")) return ["Hoopla", null];
     if (n.includes("roku channel")) return ["The Roku Channel", null];
     return null;
   }
@@ -155,7 +153,7 @@ const TMDB_IDS: Record<number, string> = {
   8: "Netflix", 1796: "Netflix", 15: "Hulu", 337: "Disney+", 9: "Prime Video", 2100: "Prime Video", 613: "Prime Video",
   386: "Peacock", 387: "Peacock", 1899: "HBO Max", 384: "HBO Max", 531: "Paramount+", 2303: "Paramount+", 2616: "Paramount+",
   350: "Apple TV+", 73: "Tubi", 300: "Pluto TV", 538: "Plex", 2383: "Philo", 43: "STARZ", 235: "YouTube",
-  191: "Kanopy", 212: "Hoopla", 207: "The Roku Channel",
+  207: "The Roku Channel",
 };
 function tmdbService(p: { provider_id: number; provider_name: string }): [string, string | null] | null {
   if (TMDB_IDS[p.provider_id]) return [TMDB_IDS[p.provider_id], null];

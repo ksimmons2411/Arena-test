@@ -255,7 +255,7 @@ const SVC = {
   "Plex": { t: "Px", c: "#E5A00D", f: "#1A1216", q: null }
 };
 const SUBS = ["Netflix", "Hulu", "Disney+", "Prime Video", "Peacock", "HBO Max", "Paramount+", "Apple TV+", "STARZ", "Philo"];
-const FREE = ["YouTube", "Tubi", "Pluto TV", "Plex", "The Roku Channel", "Kanopy", "Hoopla"];
+const FREE = ["YouTube", "Tubi", "Pluto TV", "Plex", "The Roku Channel"];
 const VIAOPT = { "HBO Max": ["Hulu", "Prime Video"], "Peacock": ["Prime Video"], "Hulu": ["Disney+"], "Paramount+": ["Prime Video"], "STARZ": ["Hulu", "Prime Video"] };
 const STORES = { "Apple TV": "https://tv.apple.com/search?term=", "Prime Video": "https://www.primevideo.com/search?phrase=", "Fandango at Home": "https://athome.fandango.com/content/browse/search?searchString=", "Google TV": "https://play.google.com/store/search?c=movies&q=" };
 const THEMES = ["Halloween", "Thanksgiving", "Christmas", "Romance", "Family", "Thriller"];
@@ -290,7 +290,7 @@ const LOGO = h => `<svg width="${(h * 96 / 36).toFixed(1)}" height="${h}" viewBo
 let tt; const toast = m => { const t = $("toast"); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); };
 
 /* ---------- where it plays ---------- */
-const srcOf = it => showOf(it).src || [];
+const srcOf = it => (showOf(it).src || []).filter(s => s.svc !== "Kanopy" && s.svc !== "Hoopla"); // library-card services: removed
 const BROKEN = s => (s.svc === "Paramount+" && !s.via) || (s.svc === "Pluto TV" && !/\/on-demand\//.test(s.u));  /* Paramount+ app rejects outside links; some Pluto links land on live TV */
 function pick(srcs) {
   const yours = s => !s.free && ST.sv.includes(s.svc) && (ST.via[s.svc] || null) === (s.via || null);
@@ -870,7 +870,7 @@ function servicesPage() {
     h += `<section class="panel warm" style="margin-top:18px"><h2 class="h3">How this TV opens Hulu</h2><p class="mute" style="margin:0 0 12px">Hulu on Fire TV can stall when it's sent straight to a title. Try each way and keep the one that plays your title with the fewest steps.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${W.map((w, k) => `<button class="chip${m === k + 1 ? " on" : ""}" data-hulu="${k + 1}">${k + 1}. ${w}</button>`).join("")}</div></section>`;
     if (VeneTV.getPrime) { const pm = +VeneTV.getPrime(), PW = ["Let Fire TV choose", "Prime's own link", "Prime's title-page link"];
       h += `<section class="panel warm" style="margin-top:18px"><h2 class="h3">How this TV opens Prime Video</h2><p class="mute" style="margin:0 0 12px">Try each way with a Prime movie and keep the one that lands on the title.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${PW.map((w, k) => `<button class="chip${pm === k + 1 ? " on" : ""}" data-prime="${k + 1}">${k + 1}. ${w}</button>`).join("")}</div></section>`; } }
-  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:18px"><section class="panel warm"><h2 class="h3">Free with ads · no account needed</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${FREE.map(n => `<button class="chip${ST.sv.includes(n) ? " on" : ""}" data-sv="${esc(n)}"><span style="width:9px;height:9px;border-radius:999px;background:${SVC[n].c}"></span>${ST.sv.includes(n) ? "✓ " : ""}${esc(n === "YouTube" ? "YouTube free movies" : n)}</button>`).join("")}</div><p class="mute" style="margin:10px 0 0;font-size:12px">Kanopy and Hoopla are free with a library card.</p></section>`;
+  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:18px"><section class="panel warm"><h2 class="h3">Free with ads · no account needed</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${FREE.map(n => `<button class="chip${ST.sv.includes(n) ? " on" : ""}" data-sv="${esc(n)}"><span style="width:9px;height:9px;border-radius:999px;background:${SVC[n].c}"></span>${ST.sv.includes(n) ? "✓ " : ""}${esc(n === "YouTube" ? "YouTube free movies" : n)}</button>`).join("")}</div></section>`;
   h += `<section class="panel warm"><h2 class="h3">Titles you own</h2>${Object.keys(ST.own).length ? Object.entries(ST.own).map(([id, s]) => BY[id] ? `<div style="display:flex;justify-content:space-between;padding:6px 0"><a href="#t:${id}">${esc(BY[id].title)}</a><span class="mute">${esc(s)}</span></div>` : "").join("") : `<p class="mute" style="margin:0">Use "Own it?" on a title page to add purchases.</p>`}</section></div>`;
   const mine = Object.keys(ST.links).filter(id => BY[id]);
   h += `<section class="panel warm" style="margin-top:18px"><h2 class="h3">Episode links</h2><p style="margin:0 0 12px;color:var(--soft);font-size:14px">You've linked ${mine.length} episode${mine.length === 1 ? "" : "s"}; ${Object.keys(D.links || {}).length} more are linked for everyone. Share yours so everyone who uses vene gets them.</p><button class="btnp" style="height:44px" data-sharelinks="1"${mine.length ? "" : " disabled"}><i style="width:30px;height:30px">${svgPlus(13)}</i>Share my links</button></section>`;
