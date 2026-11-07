@@ -106,7 +106,8 @@ const SEARCH: Record<string, string> = {
   "Prime Video": "https://www.primevideo.com/search?phrase=", "Peacock": "https://www.peacocktv.com/watch/search?q=", "HBO Max": "https://play.hbomax.com/search?q=",
   "Paramount+": "https://www.paramountplus.com/search/?q=", "Apple TV+": "https://tv.apple.com/search?term=", "YouTube": "https://www.youtube.com/results?search_query=",
   "Tubi": "https://tubitv.com/search/", "Pluto TV": "https://pluto.tv/search/details?query=", "Plex": "https://watch.plex.tv/search?q=", "Philo": "https://www.philo.com/player/search?q=",
-  "STARZ": "https://www.starz.com/us/en/search?q=",
+  "STARZ": "https://www.starz.com/us/en/search?q=", "Kanopy": "https://www.kanopy.com/en/search?query=",
+  "Hoopla": "https://www.hoopladigital.com/search?q=", "The Roku Channel": "https://therokuchannel.roku.com/search/",
 };
 
 /* ---------- where to watch ---------- */
@@ -121,6 +122,9 @@ function wmService(name: string, type: string): [string, string | null] | null {
     if (n.startsWith("peacock")) return ["Peacock", null];
     if (n.startsWith("prime video") || n.includes("freevee")) return ["Prime Video", null];
     if (n.startsWith("philo")) return ["Philo", null];
+    if (n.startsWith("kanopy")) return ["Kanopy", null];
+    if (n.startsWith("hoopla")) return ["Hoopla", null];
+    if (n.includes("roku channel")) return ["The Roku Channel", null];
     return null;
   }
   if (type !== "sub") return null;
@@ -151,6 +155,7 @@ const TMDB_IDS: Record<number, string> = {
   8: "Netflix", 1796: "Netflix", 15: "Hulu", 337: "Disney+", 9: "Prime Video", 2100: "Prime Video", 613: "Prime Video",
   386: "Peacock", 387: "Peacock", 1899: "HBO Max", 384: "HBO Max", 531: "Paramount+", 2303: "Paramount+", 2616: "Paramount+",
   350: "Apple TV+", 73: "Tubi", 300: "Pluto TV", 538: "Plex", 2383: "Philo", 43: "STARZ", 235: "YouTube",
+  191: "Kanopy", 212: "Hoopla", 207: "The Roku Channel",
 };
 function tmdbService(p: { provider_id: number; provider_name: string }): [string, string | null] | null {
   if (TMDB_IDS[p.provider_id]) return [TMDB_IDS[p.provider_id], null];
@@ -267,17 +272,30 @@ async function people(kind: "movie" | "series", id: number) {
 const NOT_A_ROLE = /\b(self|himself|herself|themselves|narrator|host|archive|uncredited|voice of)\b/i;
 async function person(id: number) {
   const d = await tmdb(`/person/${id}`, { append_to_response: "combined_credits", language: "en-US" });
-  const directing = d.known_for_department === "Directing" || d.known_for_department === "Writing" || d.known_for_department === "Production";
+  const directing = ["Directing", "Writing", "Production", "Creator"].includes(d.known_for_department);
   const credits: Any[] = directing
-    ? (d.combined_credits?.crew ?? []).filter((x: Any) => ["Director", "Creator", "Executive Producer", "Writer", "Screenplay"].includes(x.job))
-    : (d.combined_credits?.cast ?? []).filter((x: Any) => !NOT_A_ROLE.test(x.character ?? "") && (x.media_type === "movie" || (x.episode_count ?? 0) >= 4));
-  const seen = new Set<string>();
-  const items = credits
-    .filter((x: Any) => x.poster_path && !(x.genre_ids ?? []).some((g: number) => g === 10767 || g === 10763 || g === 99) && (x.vote_count ?? 0) >= 40)
-    .filter((x: Any) => { const k = x.media_type + x.id; if (seen.has(k)) return false; seen.add(k); return true; })
-    .sort((a: Any, b: Any) => (b.vote_count ?? 0) * (b.vote_average ?? 5) - (a.vote_count ?? 0) * (a.vote_average ?? 5))
-    .slice(0, 15)
-    .map((x: Any) => lite(x, x.media_type === "movie" ? "movie" : "series"));
+    ? (d.combined_credits?.crew ?? []).filter((x: Any) => ["Director", "Creator", "Executive Producer", "Writer", "Screenplay", "Showrunner"].includes(x.job))
+    : (d.combined_credits?.cast ?? []).filter((x: Any) => !NOT_A_ROLE.test(x.character ?? ""));
+  // TV gets far fewer ratings than film on TMDB, so a show where they were a regular is weighted up:
+  // Will Smith's Essentials start with The Fresh Prince, Martin Lawrence's with Martin.
+  const best = new Map<string, { x: Any; score: number }>();
+  for (const x of credits) {
+    if (!x.poster_path || (x.genre_ids ?? []).some((g: number) => g === 10767 || g === 10763 || g === 99)) continue;
+    const votes = x.vote_count ?? 0, avg = x.vote_average || 6;
+    let score: number;
+    if (x.media_type === "tv") {
+      const eps = x.episode_count ?? (directing ? 20 : 0);
+      if (eps < 4 || votes < 15) continue;
+      score = Math.log10(1 + votes) * avg * 1.45 * Math.min(1.5, 0.55 + eps / 30);
+    } else {
+      if (votes < 40) continue;
+      score = Math.log10(1 + votes) * avg;
+    }
+    const k = x.media_type + x.id;
+    if (!best.has(k) || best.get(k)!.score < score) best.set(k, { x, score });
+  }
+  const items = [...best.values()].sort((a, b) => b.score - a.score).slice(0, 15)
+    .map(({ x }) => lite(x, x.media_type === "movie" ? "movie" : "series"));
   return { id: d.id, name: d.name, img: IMG(d.profile_path, "w342"), dept: d.known_for_department, items };
 }
 async function popularPeople() { // well-known people right now, from English-language film and TV
@@ -385,7 +403,7 @@ Deno.serve(async (req) => {
       }
       case "title":
         if (!(id > 0)) return reply({ error: "bad_request" }, 400);
-        return reply({ title: await cached(`title2:${kind}:${id}`, 7 * DAY, () => title(kind, id)) });
+        return reply({ title: await cached(`title3:${kind}:${id}`, 7 * DAY, () => title(kind, id)) });
       case "season": {
         const s = Math.floor(Number(b.s));
         if (!(id > 0) || !(s >= 0)) return reply({ error: "bad_request" }, 400);
@@ -396,7 +414,7 @@ Deno.serve(async (req) => {
         return reply({ people: await cached(`people:${kind}:${id}`, 14 * DAY, () => people(kind, id)) });
       case "person":
         if (!(id > 0)) return reply({ error: "bad_request" }, 400);
-        return reply({ person: await cached(`person:${id}`, 7 * DAY, () => person(id)) });
+        return reply({ person: await cached(`person2:${id}`, 7 * DAY, () => person(id)) });
       case "popular_people":
         return reply({ people: await cached(`popular_people:${new Date().toISOString().slice(0, 10)}`, DAY, popularPeople) });
       case "discover": {

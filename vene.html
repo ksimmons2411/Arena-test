@@ -249,10 +249,13 @@ const SVC = {
   "Pluto TV": { t: "Pl", c: "#FFE14D", f: "#1A1216", q: "https://pluto.tv/search/details?query=" },
   "Philo": { t: "Ph", c: "#7C8CFF", f: "#fff", q: "https://www.philo.com/player/search?q=" },
   "STARZ": { t: "S", c: "#D9D2CC", f: "#1A1216", q: "https://www.starz.com/us/en/search?q=" },
+  "Kanopy": { t: "K", c: "#E0583A", f: "#fff", q: "https://www.kanopy.com/en/search?query=" },
+  "Hoopla": { t: "ho", c: "#2E9BD6", f: "#fff", q: "https://www.hoopladigital.com/search?q=" },
+  "The Roku Channel": { t: "R", c: "#8E4BD6", f: "#fff", q: "https://therokuchannel.roku.com/search/" },
   "Plex": { t: "Px", c: "#E5A00D", f: "#1A1216", q: null }
 };
 const SUBS = ["Netflix", "Hulu", "Disney+", "Prime Video", "Peacock", "HBO Max", "Paramount+", "Apple TV+", "STARZ", "Philo"];
-const FREE = ["YouTube", "Tubi", "Pluto TV", "Plex"];
+const FREE = ["YouTube", "Tubi", "Pluto TV", "Plex", "The Roku Channel", "Kanopy", "Hoopla"];
 const VIAOPT = { "HBO Max": ["Hulu", "Prime Video"], "Peacock": ["Prime Video"], "Hulu": ["Disney+"], "Paramount+": ["Prime Video"], "STARZ": ["Hulu", "Prime Video"] };
 const STORES = { "Apple TV": "https://tv.apple.com/search?term=", "Prime Video": "https://www.primevideo.com/search?phrase=", "Fandango at Home": "https://athome.fandango.com/content/browse/search?searchString=", "Google TV": "https://play.google.com/store/search?c=movies&q=" };
 const THEMES = ["Halloween", "Thanksgiving", "Christmas", "Romance", "Family", "Thriller"];
@@ -292,9 +295,10 @@ const BROKEN = s => (s.svc === "Paramount+" && !s.via) || (s.svc === "Pluto TV" 
 function pick(srcs) {
   const yours = s => !s.free && ST.sv.includes(s.svc) && (ST.via[s.svc] || null) === (s.via || null);
   const ok = srcs.filter(s => !BROKEN(s));
-  return ok.find(yours) || ok.find(s => s.free && ST.sv.includes(s.svc)) || ok.find(s => s.free) || srcs.find(yours) || null;
+  const LIB = ["Kanopy", "Hoopla"]; // need a library card: only when you've turned them on
+  return ok.find(yours) || ok.find(s => s.free && ST.sv.includes(s.svc)) || ok.find(s => s.free && !LIB.includes(s.svc)) || srcs.find(yours) || null;
 }
-const HOSTS = [["hulu.com", "Hulu"], ["disneyplus.com", "Disney+"], ["netflix.com", "Netflix"], ["primevideo.com", "Prime Video"], ["amazon.com", "Prime Video"], ["peacocktv.com", "Peacock"], ["hbomax.com", "HBO Max"], ["max.com", "HBO Max"], ["paramountplus.com", "Paramount+"], ["tv.apple.com", "Apple TV+"], ["youtube.com", "YouTube"], ["youtu.be", "YouTube"], ["tubitv.com", "Tubi"], ["pluto.tv", "Pluto TV"], ["plex.tv", "Plex"], ["philo.com", "Philo"], ["starz.com", "STARZ"]];
+const HOSTS = [["hulu.com", "Hulu"], ["disneyplus.com", "Disney+"], ["netflix.com", "Netflix"], ["primevideo.com", "Prime Video"], ["amazon.com", "Prime Video"], ["peacocktv.com", "Peacock"], ["hbomax.com", "HBO Max"], ["max.com", "HBO Max"], ["paramountplus.com", "Paramount+"], ["tv.apple.com", "Apple TV+"], ["youtube.com", "YouTube"], ["youtu.be", "YouTube"], ["tubitv.com", "Tubi"], ["pluto.tv", "Pluto TV"], ["plex.tv", "Plex"], ["philo.com", "Philo"], ["starz.com", "STARZ"], ["kanopy.com", "Kanopy"], ["hoopladigital.com", "Hoopla"], ["therokuchannel.roku.com", "The Roku Channel"]];
 const hostSvc = u => { try { const h = new URL(u).hostname; const m = HOSTS.find(([d]) => h === d || h.endsWith("." + d)); return m ? m[1] : null; } catch (e) { return null; } };
 const linkOf = id => ST.links[id] || (D.links || {})[id] || null;
 const extractUrl = t => { const m = String(t || "").match(/https:\/\/[^\s"'<>]+/); return m ? m[0].replace(/[).,]+$/, "") : null; };
@@ -316,7 +320,7 @@ function target(it) {
   if (BROKEN(s) && s.svc === "Pluto TV") return { n: "Pluto TV", u: s.u, mine: !!p, svc: "Pluto TV" };
   if (BROKEN(s)) return { n: "Paramount+", u: isTV() ? SVC["Paramount+"].q + encodeURIComponent(base.title) : "https://www.paramountplus.com/", mine: !!p, svc: "Paramount+", copy: base.title, openApp: true };
   if (it.kind === "episode") return { n: app, u: SVC[app] && SVC[app].q ? SVC[app].q + q : s.u, mine: !!p, search: true, svc: s.svc };
-  return { n: s.via ? s.svc + " in " + s.via : s.svc, u: s.u, mine: !!p, svc: s.svc, search: !!s.search };
+  return { n: s.via ? s.svc + " in " + s.via : s.svc, u: s.u, mine: !!p && ST.sv.includes(s.svc), svc: s.svc, search: !!s.search };
 }
 const playLabel = t => t.openApp ? "Open Paramount+" : t.exact ? "Play on " + t.n : t.owned ? "Play from " + t.n : t.check ? "Check " + t.n : t.rent ? "Rent or buy on " + t.n : t.search ? "Find in " + t.n : "Play on " + t.n;
 const svcColor = t => (SVC[t.svc] || SVC[t.n] || { c: "#9C8C8A" }).c;
@@ -480,6 +484,10 @@ function titlePage(id) {
   srcs.forEach(s => { const sv = SVC[s.svc] || { t: "", c: "#9C8C8A", f: "#fff" }, isPick = !chosen.owned && chosen.svc === s.svc && (chosen.n.includes(s.via || s.svc));
     const rowU = BROKEN(s) && s.svc === "Paramount+" ? (isTV() ? SVC["Paramount+"].q + encodeURIComponent(base.title) : "https://www.paramountplus.com/") : ep && !ST.links[it.id] ? (SVC[s.via || s.svc] && SVC[s.via || s.svc].q ? SVC[s.via || s.svc].q + encodeURIComponent(base.title) : s.u) : s.u;
     h += `<a href="${esc(rowU)}" style="text-decoration:none;display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:14px;${isPick ? "background:rgba(255,178,56,.10);border:1px solid rgba(255,178,56,.3)" : ""}">${isPick ? `<span style="width:28px;height:28px;border-radius:999px;background:${sv.c};color:${sv.f};font:800 10px var(--body);display:grid;place-items:center;box-shadow:0 0 0 3px rgba(255,178,56,.35)">${esc(sv.t)}</span>` : `<span style="width:12px;height:12px;margin:0 8px;border-radius:999px;background:${sv.c}"></span>`}<span style="flex:1;display:flex;flex-direction:column"><b style="font-weight:${isPick ? 700 : 500}">${esc(s.svc)}${s.via ? `, inside ${esc(s.via)}` : ""}</b>${isPick ? `<span style="font-size:12px;color:var(--amber-hi)">${chosen.mine ? "Yours · " : ""}${ep ? "opens a search for the show" : "opens here"}</span>` : ""}</span><span class="mute" style="font-size:12px">${BROKEN(s) && s.svc === "Paramount+" ? "Opens the app; search there" : s.free ? "Free · tap to open" : ST.sv.includes(s.svc) ? "In My Services" : "Tap to open"}</span></a>`; });
+  if (!waiting) { // where-to-watch data is weakest for free services: offer one-tap searches on the free ones you use
+    const have = new Set(srcs.map(x => x.svc)), freeTry = FREE.filter(n => ST.sv.includes(n) && !have.has(n) && SVC[n] && SVC[n].q);
+    if (freeTry.length) h += `<div style="padding:12px 10px 4px;border-top:1px solid var(--line);margin-top:6px"><span class="mute" style="font-size:12px;display:block;margin-bottom:8px">${srcs.length ? "Also try free services" : "Try free services"} · their listings are often missing</span><div style="display:flex;gap:8px;flex-wrap:wrap">${freeTry.map(n => `<a class="chip" style="text-decoration:none" href="${esc(SVC[n].q + encodeURIComponent(base.title + (n === "YouTube" ? (ser || ep ? " full episodes" : " full movie") : "")))}"><span style="width:9px;height:9px;border-radius:999px;background:${SVC[n].c}"></span>${esc(n === "YouTube" ? "YouTube" : n)}</a>`).join("")}</div></div>`;
+  }
   const buys = Object.keys(base.buy || {});
   if (buys.length) h += `<div style="display:flex;align-items:center;gap:12px;padding:9px 10px"><span style="width:12px;height:12px;margin:0 8px;border-radius:999px;background:#9C8C8A"></span><span style="flex:1;display:flex;flex-direction:column"><span>Rent or buy</span><span class="mute" style="font-size:12px">${buys.map(b => `<a href="${esc(base.buy[b])}">${esc(b)}</a>`).join(" · ")}</span></span></div>`;
   h += `</section>`;
@@ -862,7 +870,7 @@ function servicesPage() {
     h += `<section class="panel warm" style="margin-top:18px"><h2 class="h3">How this TV opens Hulu</h2><p class="mute" style="margin:0 0 12px">Hulu on Fire TV can stall when it's sent straight to a title. Try each way and keep the one that plays your title with the fewest steps.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${W.map((w, k) => `<button class="chip${m === k + 1 ? " on" : ""}" data-hulu="${k + 1}">${k + 1}. ${w}</button>`).join("")}</div></section>`;
     if (VeneTV.getPrime) { const pm = +VeneTV.getPrime(), PW = ["Let Fire TV choose", "Prime's own link", "Prime's title-page link"];
       h += `<section class="panel warm" style="margin-top:18px"><h2 class="h3">How this TV opens Prime Video</h2><p class="mute" style="margin:0 0 12px">Try each way with a Prime movie and keep the one that lands on the title.</p><div style="display:flex;gap:8px;flex-wrap:wrap">${PW.map((w, k) => `<button class="chip${pm === k + 1 ? " on" : ""}" data-prime="${k + 1}">${k + 1}. ${w}</button>`).join("")}</div></section>`; } }
-  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:18px"><section class="panel warm"><h2 class="h3">Free with ads · no account needed</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${FREE.map(n => `<button class="chip${ST.sv.includes(n) ? " on" : ""}" data-sv="${esc(n)}"><span style="width:9px;height:9px;border-radius:999px;background:${SVC[n].c}"></span>${ST.sv.includes(n) ? "✓ " : ""}${esc(n === "YouTube" ? "YouTube free movies" : n)}</button>`).join("")}</div></section>`;
+  h += `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:18px"><section class="panel warm"><h2 class="h3">Free with ads · no account needed</h2><div style="display:flex;gap:8px;flex-wrap:wrap">${FREE.map(n => `<button class="chip${ST.sv.includes(n) ? " on" : ""}" data-sv="${esc(n)}"><span style="width:9px;height:9px;border-radius:999px;background:${SVC[n].c}"></span>${ST.sv.includes(n) ? "✓ " : ""}${esc(n === "YouTube" ? "YouTube free movies" : n)}</button>`).join("")}</div><p class="mute" style="margin:10px 0 0;font-size:12px">Kanopy and Hoopla are free with a library card.</p></section>`;
   h += `<section class="panel warm"><h2 class="h3">Titles you own</h2>${Object.keys(ST.own).length ? Object.entries(ST.own).map(([id, s]) => BY[id] ? `<div style="display:flex;justify-content:space-between;padding:6px 0"><a href="#t:${id}">${esc(BY[id].title)}</a><span class="mute">${esc(s)}</span></div>` : "").join("") : `<p class="mute" style="margin:0">Use "Own it?" on a title page to add purchases.</p>`}</section></div>`;
   const mine = Object.keys(ST.links).filter(id => BY[id]);
   h += `<section class="panel warm" style="margin-top:18px"><h2 class="h3">Episode links</h2><p style="margin:0 0 12px;color:var(--soft);font-size:14px">You've linked ${mine.length} episode${mine.length === 1 ? "" : "s"}; ${Object.keys(D.links || {}).length} more are linked for everyone. Share yours so everyone who uses vene gets them.</p><button class="btnp" style="height:44px" data-sharelinks="1"${mine.length ? "" : " disabled"}><i style="width:30px;height:30px">${svgPlus(13)}</i>Share my links</button></section>`;
