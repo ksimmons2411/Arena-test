@@ -216,7 +216,7 @@ html.tv *{scroll-behavior:auto}
   const s = document.getElementById("splash"); let seen = null;
   try { seen = sessionStorage.getItem("vene.opened"); sessionStorage.setItem("vene.opened", "1"); } catch (e) {}
   const gone = () => { if (s.parentNode) s.remove(); };
-  if (seen) { gone(); return; }
+  if (seen || /[?&]resume=1/.test(location.search)) { gone(); return; } // the TV app refreshing its screen: no animation
   s.addEventListener("click", () => s.classList.add("skip"));
   document.addEventListener("keydown", () => s.classList.add("skip"), { once: true });
   setTimeout(gone, 2600);
